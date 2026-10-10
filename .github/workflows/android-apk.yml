@@ -24,11 +24,40 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Gercek TES-IS logosunu hazirla
+        run: |
+          base64 --decode app/logo.base64 > app/src/main/res/drawable/tes_is_gercek_logo.png
+          file app/src/main/res/drawable/tes_is_gercek_logo.png
       - name: APK derle
         run: gradle --no-daemon :app:assembleDebug
+      - name: APK dogrula
+        run: |
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
       - name: Kurulabilir APK'yi sakla
         uses: actions/upload-artifact@v4
         with:
           name: TESIS-Istanbul1-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Android emulatorde kur ve ac
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          ram-size: 1536M
+          heap-size: 256M
+          disk-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none -memory 1536
+          emulator-boot-timeout: 900
+          script: |
+            adb wait-for-device
+            adb install --no-streaming -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n tr.org.tesis.istanbulbir.uygulama/tr.org.tesis.istanbulbir.MainActivity
+            sleep 6
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|tr.org.tesis.istanbulbir'
+            adb logcat -d -t 1000 | grep -i 'FATAL EXCEPTION' && exit 1 || true

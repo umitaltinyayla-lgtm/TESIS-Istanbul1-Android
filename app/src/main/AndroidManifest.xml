@@ -4,8 +4,8 @@
     <application
         android:allowBackup="false"
         android:label="@string/app_name"
-        android:icon="@drawable/tesis_logo"
-        android:roundIcon="@drawable/tesis_logo"
+        android:icon="@drawable/tes_is_gercek_logo"
+        android:roundIcon="@drawable/tes_is_gercek_logo"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
