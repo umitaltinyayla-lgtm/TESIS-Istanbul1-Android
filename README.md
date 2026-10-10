@@ -8,3 +8,6 @@ APK derlemesi GitHub Actions üzerinden Android SDK + Gradle ile yapılır. İlk
 main dalına değişiklik gönderildiğinde "TES-IS Android APK" iş akışı otomatik çalışır. Actions bölümündeki başarılı derlemenin Artifacts alanından "TESIS-Istanbul1-Android-APK" dosyasını indirin. ZIP içinde app-debug.apk bulunur.
 
 Bu APK Android Debug anahtarıyla imzalanmıştır. Geliştirme/test amaçlıdır; Play Store dağıtımı için sürüm imza anahtarı gerekir.
+
+## Derleme dogrulamasi
+Bu degisiklik Android APK derlemesini test eder.
