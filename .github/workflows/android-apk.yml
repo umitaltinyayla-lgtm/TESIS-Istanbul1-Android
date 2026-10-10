@@ -26,6 +26,26 @@ jobs:
           gradle-version: '8.10.2'
       - name: APK derle
         run: gradle --no-daemon :app:assembleDebug
+      - name: APK dogrula
+        run: |
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
+      - name: Android emulatorde kur ve ac
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n tr.org.tesis.istanbulbir.uygulama/tr.org.tesis.istanbulbir.MainActivity
+            sleep 10
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|tr.org.tesis.istanbulbir'
+            adb logcat -d -t 1000 | grep -i 'FATAL EXCEPTION' && exit 1 || true
       - name: Kurulabilir APK'yi sakla
         uses: actions/upload-artifact@v4
         with:
