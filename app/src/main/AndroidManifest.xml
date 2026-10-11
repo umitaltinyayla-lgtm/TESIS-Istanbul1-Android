@@ -11,7 +11,11 @@
         android:roundIcon="@drawable/tes_is_gercek_logo"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/TesisAppTheme">
+        <!-- Firebase otomatik bildirimler icin de TES-IS simgesini kullansin. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/tesis_notification_small" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

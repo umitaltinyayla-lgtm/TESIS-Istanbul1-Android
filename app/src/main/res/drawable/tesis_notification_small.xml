@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- TES-IS ambleminin tek renkli, durum cubuguna uygun sade simgesi. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="7"
+        android:fillColor="#00000000"
+        android:pathData="M48,7 A41,41 0,1 1,47.99 7" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M48,17 L51,24 L59,24 L53,29 L55,36 L48,32 L41,36 L43,29 L37,24 L45,24 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M29,31 C17,47 25,70 48,76 C71,70 79,47 67,31 C72,51 64,62 48,65 C32,62 24,51 29,31 Z" />
+</vector>

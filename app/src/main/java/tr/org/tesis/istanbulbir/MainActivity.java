@@ -8,12 +8,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -31,6 +36,7 @@ public class MainActivity extends Activity {
     public static final String HOMEPAGE = "https://ist1tes-is.com.tr/";
     public static final String EXTRA_URL = "open_url";
     private static final String TOPIC = "tesis_istanbul1_duyuru";
+    private static final int TESIS_BLUE = Color.rgb(16, 57, 95);
     private WebView webView;
     private ProgressBar progress;
 
@@ -58,20 +64,71 @@ public class MainActivity extends Activity {
         return isTrustedSite(url) ? url : HOMEPAGE;
     }
 
+    /** Telefonlarda delik/kamera/centik alanini da kapsayan sabit lacivert durum cubugu. */
+    private void configureSystemBars() {
+        Window window = getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
+                | WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+        int visibility = window.getDecorView().getSystemUiVisibility();
+        visibility &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        window.getDecorView().setSystemUiVisibility(visibility);
+        if (Build.VERSION.SDK_INT >= 30) {
+            // Android 15+'ta sistem cubuklari transparent olabilir; arka plan ayni mavi renktir.
+            window.setDecorFitsSystemWindows(false);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsAppearance(0,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            window.setStatusBarColor(TESIS_BLUE);
+            window.setNavigationBarColor(TESIS_BLUE);
+        }
+        if (Build.VERSION.SDK_INT >= 29) {
+            window.setStatusBarContrastEnforced(false);
+            window.setNavigationBarContrastEnforced(false);
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(16, 38, 63));
-        getWindow().setNavigationBarColor(Color.rgb(16, 38, 63));
+        configureSystemBars();
 
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(TESIS_BLUE);
         FrameLayout layout = new FrameLayout(this);
+        layout.setBackgroundColor(Color.WHITE);
+        root.addView(layout, new FrameLayout.LayoutParams(-1, -1));
         webView = new WebView(this);
         webView.setBackgroundColor(Color.WHITE);
         layout.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         layout.addView(progress, new FrameLayout.LayoutParams(-1, 6, Gravity.TOP));
-        setContentView(layout);
+        setContentView(root);
+
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout());
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) layout.getLayoutParams();
+                if (lp.topMargin != bars.top || lp.bottomMargin != bars.bottom
+                        || lp.leftMargin != bars.left || lp.rightMargin != bars.right) {
+                    lp.topMargin = bars.top;
+                    lp.bottomMargin = bars.bottom;
+                    lp.leftMargin = bars.left;
+                    lp.rightMargin = bars.right;
+                    layout.setLayoutParams(lp);
+                }
+                return insets;
+            });
+            root.requestApplyInsets();
+        }
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);

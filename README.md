@@ -20,3 +20,12 @@ Android uygulaması: https://ist1tes-is.com.tr/
 GitHub Actions iş akışı Android SDK/Gradle ile APK üretir, imza ve ZIP bütünlüğünü doğrular, emülatörde kurup açmayı test eder.
 
 `app/logo.base64` içerisindeki TES-İŞ logosu derlemede uygulama simgesine dönüştürülür.
+
+## V1.7 yenilikleri
+
+- Sabit lacivert-mavi Android durum cubugu, kamera deligi ve centik alaninda da ayni renk.
+- Saat, pil ve bildirim isaretleri icin beyaz sistem simgeleri.
+- Bildirim durum simgesinde unlem yerine TES-IS ambleminin tek renkli hali.
+- Bildirim kutusunda resmi renkli TES-IS logosu, duyuru basligi ve acilabilir uzun aciklama.
+- WordPress eklentisi V1.1 kuruldugunda FCM `title` alanina duyuru basligi, `body` alanina duyuru aciklamasinin ilk 200 karakteri gonderilir.
+- WordPress eklentisi guncellemesi esnasinda `tesis_mb_encrypted_service_account_v1` ayar anahtari degismedigi icin baglanti saklanir.
