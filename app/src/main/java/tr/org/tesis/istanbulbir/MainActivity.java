@@ -8,10 +8,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -26,6 +30,9 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
@@ -39,6 +46,9 @@ public class MainActivity extends Activity {
     private static final int TESIS_BLUE = Color.rgb(16, 57, 95);
     private WebView webView;
     private ProgressBar progress;
+    private FrameLayout splashOverlay;
+    private final Handler splashHandler = new Handler(Looper.getMainLooper());
+    private boolean splashDismissed = false;
 
     public static boolean isTrustedSite(String value) {
         if (value == null || value.trim().isEmpty()) return false;
@@ -94,6 +104,89 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    /** Logo internetten gelene kadar telefonda paketli TES-IS logosunu goster. */
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void showNativeSplash(FrameLayout root) {
+        splashOverlay = new FrameLayout(this);
+        splashOverlay.setBackgroundColor(TESIS_BLUE);
+        root.addView(splashOverlay, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+                -2, -2, Gravity.CENTER);
+        splashOverlay.addView(center, centerParams);
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.tes_is_gercek_logo);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        GradientDrawable whiteCircle = new GradientDrawable();
+        whiteCircle.setShape(GradientDrawable.OVAL);
+        whiteCircle.setColor(Color.WHITE);
+        logo.setBackground(whiteCircle);
+        logo.setPadding(dp(13), dp(13), dp(13), dp(13));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(156), dp(156));
+        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+        center.addView(logo, logoParams);
+
+        TextView title = new TextView(this);
+        title.setText("TES-İŞ");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(28);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(23);
+        center.addView(title, titleParams);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("İSTANBUL 1 NO'LU ŞUBE");
+        subtitle.setTextColor(Color.rgb(221, 233, 244));
+        subtitle.setTextSize(13);
+        subtitle.setLetterSpacing(0.1f);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(6);
+        center.addView(subtitle, subtitleParams);
+
+        // Cevapsiz ag istekleri acilis ekranini sonsuza kadar kilitlemesin.
+        splashHandler.postDelayed(this::dismissNativeSplash, 9000);
+    }
+
+    private void waitForSiteLogos(WebView view, int tries) {
+        if (splashDismissed || splashOverlay == null || webView == null) return;
+        view.evaluateJavascript(
+                "(function(){var els=document.querySelectorAll('.brand img,.hero-logo img');"
+              + "return document.readyState==='complete' && els.length>0 && "
+              + "Array.prototype.every.call(els,function(i){return i.complete && i.naturalWidth>0;});})()",
+                result -> {
+                    if (splashDismissed || splashOverlay == null) return;
+                    if ("true".equals(result) || tries >= 35) {
+                        // DOM ve logonun ilk karesi ekrana cizilsin.
+                        splashHandler.postDelayed(this::dismissNativeSplash, 130);
+                    } else {
+                        splashHandler.postDelayed(() -> waitForSiteLogos(view, tries + 1), 120);
+                    }
+                });
+    }
+
+    private void dismissNativeSplash() {
+        if (splashDismissed || splashOverlay == null) return;
+        splashDismissed = true;
+        FrameLayout overlay = splashOverlay;
+        splashOverlay = null;
+        overlay.animate().alpha(0f).setDuration(180).withEndAction(() -> {
+            if (overlay.getParent() instanceof FrameLayout) {
+                ((FrameLayout) overlay.getParent()).removeView(overlay);
+            }
+        }).start();
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -110,6 +203,7 @@ public class MainActivity extends Activity {
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         layout.addView(progress, new FrameLayout.LayoutParams(-1, 6, Gravity.TOP));
+        showNativeSplash(root);
         setContentView(root);
 
         if (Build.VERSION.SDK_INT >= 30) {
@@ -144,6 +238,10 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (!splashDismissed) waitForSiteLogos(view, 0);
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return request.isForMainFrame() && openExternalWhenNeeded(request.getUrl());
             }
@@ -197,6 +295,7 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
     @Override protected void onDestroy() {
+        splashHandler.removeCallbacksAndMessages(null);
         if (webView != null) { webView.destroy(); webView = null; }
         super.onDestroy();
     }
