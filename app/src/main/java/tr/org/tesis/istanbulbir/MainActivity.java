@@ -132,7 +132,6 @@ public class MainActivity extends Activity {
         logo.setContentDescription("TES-İŞ Sendikası Logosu");
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         logo.setAdjustViewBounds(true);
-        logo.setFilterBitmap(true);
         GradientDrawable whiteCircle = new GradientDrawable();
         whiteCircle.setShape(GradientDrawable.OVAL);
         whiteCircle.setColor(Color.WHITE);
