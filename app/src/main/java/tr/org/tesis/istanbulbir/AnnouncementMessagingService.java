@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.util.Log;
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -57,11 +58,15 @@ public final class AnnouncementMessagingService extends FirebaseMessagingService
                 ? new Notification.Builder(this, CHANNEL_ID)
                 : new Notification.Builder(this);
         nm.notify(id, builder
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setColor(Color.rgb(209, 30, 50))
-                .setContentTitle(title)
-                .setContentText(body)
-                .setStyle(new Notification.BigTextStyle().bigText(body))
+                // Durum cubugunda unlem yerine TES-IS ambleminin beyaz simgesi.
+                .setSmallIcon(R.drawable.tesis_notification_small)
+                // Bildirim acilinca resmi renkli TES-IS logosu gorunur.
+                .setLargeIcon(BitmapFactory.decodeResource(getResources(), R.drawable.tes_is_gercek_logo))
+                .setColor(Color.rgb(16, 57, 95))
+                .setSubText("TES-İŞ İstanbul 1")
+                .setContentTitle(title.trim())
+                .setContentText(body.trim())
+                .setStyle(new Notification.BigTextStyle().setBigContentTitle(title.trim()).bigText(body.trim()))
                 .setAutoCancel(true)
                 .setContentIntent(pending)
                 .build());
