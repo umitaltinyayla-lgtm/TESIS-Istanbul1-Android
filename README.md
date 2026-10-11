@@ -1,24 +1,22 @@
 # TES-İŞ İstanbul 1 Android uygulaması
 
-Siteden haber ve duyuruları görüntüleyen Android uygulaması.
+Android uygulaması: https://ist1tes-is.com.tr/
 
-## Bildirimler
-Yeni WordPress `tesis_duyuru` yayımlandığında Firebase Cloud Messaging (FCM) topic
-`tesis_istanbul1_duyuru` aracılığıyla cihazlara veri bildirimi gönderilir.
+## Firebase push bildirimleri
 
-- Uygulama `POST_NOTIFICATIONS` izni ister.
-- FCM token alınır ve topic aboneliği yapılır.
-- Bildirime basınca ilgili duyuru uygulamada açılır.
-- WordPress tarafına `TESIS-WORDPRESS-MOBIL-BILDIRIM.zip` eklentisi kurulmalıdır.
-- Bildirim gönderebilmek için Firebase projesi ve güvenli sunucu servis hesabı bağlantısı gerekir.
-- Android Firebase uygulamasının PUBLIC yapılandırması `app/src/main/res/values/firebase_config.xml` içine yazılır.
-- **Servis hesabının JSON özel anahtarı Android projesine veya GitHub'a kesinlikle eklenmez.**
+- **Android Firebase istemci bağlantısı yapılandırıldı**: Firebase projesi `tesis-istanbul-1` (`939464714660`).
+- Android paket adı: `tr.org.tesis.istanbulbir.uygulama`.
+- Android 13+ için bildirim izni istenir.
+- FCM topic: `tesis_istanbul1_duyuru`.
+- Uygulama kapalıyken gelen yüksek öncelikli veri mesajı bildirim merkezinde gösterilir; bildirime basınca ilgili duyuru uygulamada açılır.
+- Bildirimlerin gerçekten gönderilebilmesi için WordPress'de kurulu `TESIS-WORDPRESS-MOBIL-BILDIRIM.zip` eklentisindeki **Firebase servis hesabı** ayrıca bağlanmalıdır.
+- WordPress eklentisinde Firebase Console → Project settings → Service accounts → Generate new private key ile edinilen JSON dosyası **doğrudan WordPress yönetim paneline** yüklenir.
+- **Servis hesabı özel anahtarını asla Android projesine, APK'ye veya herkese açık GitHub deposuna koymayın.**
+- `google-services.json` dosyasındaki API anahtarı Android uygulamasının herkese açık istemci yapılandırmasının parçasıdır; bu, FCM gönderim yetkisi taşıyan servis hesabı anahtarı değildir.
+- WordPress'e servis hesabı eklenince bildirim testi için `Ayarlar → TES-İŞ Mobil Bildirim` sayfasındaki test butonu kullanılabilir.
 
-Firebase yapılandırması eklenmediyse uygulama sitesi çalışır, bildirim almaz.
-Firebase Cloud Messaging ücret gerektirmeden temel mesajlaşmayı destekler.
+## APK üretimi
 
-## APK derlemesi
-GitHub Actions: TES-IS Android APK iş akışı, gerçek Android SDK/Gradle ile APK üretir,
-APK imzasını doğrular, artifact yükler ve Android emülatöründe kurup açmayı dener.
+GitHub Actions iş akışı Android SDK/Gradle ile APK üretir, imza ve ZIP bütünlüğünü doğrular, emülatörde kurup açmayı test eder.
 
-`app/logo.base64` içindeki gerçek TES-İŞ logosu derlemede PNG simgesine dönüştürülür.
+`app/logo.base64` içerisindeki TES-İŞ logosu derlemede uygulama simgesine dönüştürülür.

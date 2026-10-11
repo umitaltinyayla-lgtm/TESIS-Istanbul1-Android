@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Firebase projesi bağlanınca bu dört herkese açık yapılandırma değeri doldurulur.
-         Özel servis hesabı ve gizli anahtarlar kesinlikle Android'e eklenmez. -->
-    <string name="firebase_app_id" translatable="false"></string>
-    <string name="firebase_api_key" translatable="false"></string>
-    <string name="firebase_sender_id" translatable="false"></string>
-    <string name="firebase_project_id" translatable="false"></string>
+    <!-- Firebase Android SDK public client configuration. Private service-account credentials must never be packaged in the app. -->
+    <string name="firebase_app_id" translatable="false">1:939464714660:android:e23fb1972e906a916cf931</string>
+    <string name="firebase_api_key" translatable="false">AIzaSyCua8zo0e7PjXK1Ua-62BAyHrAOytNYmrg</string>
+    <string name="firebase_sender_id" translatable="false">939464714660</string>
+    <string name="firebase_project_id" translatable="false">tesis-istanbul-1</string>
 </resources>
