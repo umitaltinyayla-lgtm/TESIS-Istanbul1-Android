@@ -29,3 +29,10 @@ GitHub Actions iş akışı Android SDK/Gradle ile APK üretir, imza ve ZIP büt
 - Bildirim kutusunda resmi renkli TES-IS logosu, duyuru basligi ve acilabilir uzun aciklama.
 - WordPress eklentisi V1.1 kuruldugunda FCM `title` alanina duyuru basligi, `body` alanina duyuru aciklamasinin ilk 200 karakteri gonderilir.
 - WordPress eklentisi guncellemesi esnasinda `tesis_mb_encrypted_service_account_v1` ayar anahtari degismedigi icin baglanti saklanir.
+
+## V1.8 — Anlık marka logosu ve temiz açılış
+
+- TES-İŞ logosu APK içine paketli; uygulama açılır açılmaz lacivert arka planda gösterilir.
+- WebView internetten WordPress logosunu yükleyene kadar gri/boş alan yerine TES-İŞ ekranı görünür.
+- Logolar ve ilk sayfa tamamen yüklenince açılış ekranı yumuşak geçişle kapanır; ağ sorunu varsa 9 saniyede otomatik geçer.
+- WordPress V4.9 tema ile logo WebP sıkıştırılmış ve öncelikli indirilecek biçimde sunulur.
