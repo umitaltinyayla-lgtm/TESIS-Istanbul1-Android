@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
           p = Path("app/src/main/res/drawable/tes_is_gercek_logo.png")
           data = p.read_bytes()
-          assert data[:8] == b"\\x89PNG\\r\\n\\x1a\\n", "Logo must be PNG"
+          assert data[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10)), "Logo must be PNG"
           w,h = struct.unpack(">II", data[16:24])
           print(f"Verified original TES-IS logo: {w}x{h}, {len(data)} bytes")
           assert w >= 256 and h >= 256, "Low-resolution logo rejected"
