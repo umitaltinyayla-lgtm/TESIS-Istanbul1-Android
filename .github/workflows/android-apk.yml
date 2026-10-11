@@ -1,4 +1,4 @@
-name: TES-IS Android APK
+name: TES-IS Android APK ve AAB
 
 on:
   push:
@@ -53,6 +53,18 @@ jobs:
         with:
           name: TESIS-Istanbul1-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: AAB derle (Play Store icin imzasiz taslak)
+        run: gradle --no-daemon :app:bundleRelease
+      - name: AAB dosyasini dogrula
+        run: |
+          test -s app/build/outputs/bundle/release/app-release.aab
+          unzip -t app/build/outputs/bundle/release/app-release.aab
+      - name: AAB taslagini sakla (imza gerektirir)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TESIS-Istanbul1-Android-AAB-UNSIGNED
+          path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
       - name: Android emulatorde kur ve ac
         uses: ReactiveCircus/android-emulator-runner@v2
