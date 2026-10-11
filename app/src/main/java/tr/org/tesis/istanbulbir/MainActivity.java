@@ -118,13 +118,20 @@ public class MainActivity extends Activity {
         LinearLayout center = new LinearLayout(this);
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER);
+        // Kayip "ŞUBE" sorununun nedeni: ic kap 156dp logoya gore dar olculuyordu.
+        // Tum ekran genisligini kullan, uzun alt basligi kirpma.
         FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
-                -2, -2, Gravity.CENTER);
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        centerParams.leftMargin = dp(20);
+        centerParams.rightMargin = dp(20);
         splashOverlay.addView(center, centerParams);
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.tes_is_gercek_logo);
+        logo.setContentDescription("TES-İŞ Sendikası Logosu");
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setAdjustViewBounds(true);
         GradientDrawable whiteCircle = new GradientDrawable();
         whiteCircle.setShape(GradientDrawable.OVAL);
         whiteCircle.setColor(Color.WHITE);
@@ -146,10 +153,14 @@ public class MainActivity extends Activity {
 
         TextView subtitle = new TextView(this);
         subtitle.setText("İSTANBUL 1 NO'LU ŞUBE");
-        subtitle.setTextColor(Color.rgb(221, 233, 244));
-        subtitle.setTextSize(13);
-        subtitle.setLetterSpacing(0.1f);
+        subtitle.setTextColor(Color.rgb(236, 246, 252));
+        subtitle.setTextSize(14);
+        subtitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        subtitle.setLetterSpacing(0.035f);
         subtitle.setGravity(Gravity.CENTER);
+        subtitle.setSingleLine(false);
+        subtitle.setMaxLines(2);
+        subtitle.setIncludeFontPadding(true);
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
         subtitleParams.topMargin = dp(6);
         center.addView(subtitle, subtitleParams);

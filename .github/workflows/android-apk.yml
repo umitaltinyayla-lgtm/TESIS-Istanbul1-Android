@@ -24,10 +24,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Gercek TES-IS logosunu hazirla
+      - name: Orijinal yuksek cozunurluklu TES-IS logosunu hazirla
         run: |
-          base64 --decode app/logo.base64 > app/src/main/res/drawable/tes_is_gercek_logo.png
-          file app/src/main/res/drawable/tes_is_gercek_logo.png
+          set -euo pipefail
+          LOGO_OUT="app/src/main/res/drawable/tes_is_gercek_logo.png"
+          LOGO_URL="https://ist1tes-is.com.tr/wp-content/themes/tes-is-ist1-wordpress/assets/logo.png"
+          curl --fail --show-error --silent --location --retry 3 --connect-timeout 15 --max-time 75 "$LOGO_URL" --output "$LOGO_OUT"
+          file "$LOGO_OUT"
+          python3 - <<'PY'
+          import struct
+          from pathlib import Path
+          p = Path("app/src/main/res/drawable/tes_is_gercek_logo.png")
+          data = p.read_bytes()
+          assert data[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10)), "Logo must be PNG"
+          w,h = struct.unpack(">II", data[16:24])
+          print(f"Verified original TES-IS logo: {w}x{h}, {len(data)} bytes")
+          assert w >= 256 and h >= 256, "Low-resolution logo rejected"
+          PY
       - name: APK derle
         run: gradle --no-daemon :app:assembleDebug
       - name: APK dogrula
