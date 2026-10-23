@@ -301,7 +301,7 @@ public class MainActivity extends Activity {
     private void registerDevice(String token) {
         if (webView == null || !isTrustedSite(webView.getUrl()) || token == null) return;
         String quoted = JSONObject.quote(token);
-        webView.evaluateJavascript("(function(){var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n||!n.content)return;fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})}).catch(function(){});})();", null);
+        webView.evaluateJavascript("(function(){var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');if(!n||!n.content)return;fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})}).catch(function(){});})();", null);
         webView.evaluateJavascript("(function(){if(window.__tesisMemberHook)return;window.__tesisMemberHook=true;document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('tesis-logout-form'))return;e.preventDefault();e.stopImmediatePropagation();if(!confirm('Çıkış yapmak istiyor musunuz?'))return;window.__tesisPendingLogout=f;TesisNative.logout();},true)})();",null);
     }
     public class MemberBridge {
@@ -311,7 +311,7 @@ public class MainActivity extends Activity {
                 FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
                     if (webView == null) return;
                     String quoted = JSONObject.quote(token);
-                    String script = "(async function(){try{var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n){TesisNative.fail('Üye oturumu bulunamadı');return;}var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){TesisNative.fail('Cihaz kaydı silinemedi: '+r.status);return;}TesisNative.finish();}catch(e){TesisNative.fail('Bağlantı hatası');}})()";
+                    String script = "(async function(){try{var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');if(!n){TesisNative.fail('Üye oturumu bulunamadı');return;}var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){TesisNative.fail('Cihaz kaydı silinemedi: '+r.status);return;}TesisNative.finish();}catch(e){TesisNative.fail('Bağlantı hatası');}})()";
                     webView.evaluateJavascript(script,null);
                 }).addOnFailureListener(e -> Toast.makeText(MainActivity.this,"Cihaz belirteci okunamadı",Toast.LENGTH_LONG).show());
             });
