@@ -1,5 +1,7 @@
 name: TESIS Android AAB (Test)
 on:
+  push:
+    branches: [tes-is-v1.11-kurum-bildirim-test]
   workflow_dispatch:
 jobs:
   build:
