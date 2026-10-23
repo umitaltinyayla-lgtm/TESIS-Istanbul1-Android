@@ -18,6 +18,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Restore original TES-IS logo
+        run: |
+          mkdir -p app/src/main/res/drawable
+          curl --fail --location --retry 3 --silent --show-error 'https://ist1tes-is.com.tr/wp-content/themes/tes-is-ist1-wordpress/assets/logo.png' --output app/src/main/res/drawable/tes_is_gercek_logo.png
+          file app/src/main/res/drawable/tes_is_gercek_logo.png
       - name: Build unsigned AAB
         run: gradle --no-daemon :app:bundleRelease
       - uses: actions/upload-artifact@v4
