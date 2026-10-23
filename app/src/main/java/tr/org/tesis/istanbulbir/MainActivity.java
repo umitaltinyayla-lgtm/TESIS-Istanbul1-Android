@@ -24,6 +24,8 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
+import org.json.JSONObject;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -242,6 +244,7 @@ public class MainActivity extends Activity {
         settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         CookieManager.getInstance().setAcceptCookie(true);
+        webView.addJavascriptInterface(new MemberBridge(), "TesisNative");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
@@ -252,6 +255,7 @@ public class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (!splashDismissed) waitForSiteLogos(view, 0);
+                if (isTrustedSite(url)) registerDeviceToken();
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return request.isForMainFrame() && openExternalWhenNeeded(request.getUrl());
@@ -272,7 +276,9 @@ public class MainActivity extends Activity {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 314);
         }
-        subscribeToAnnouncements(this);
+        // V1.11: legacy global-topic subscription is deliberately disabled.
+        FirebaseMessaging.getInstance().unsubscribeFromTopic(TOPIC);
+        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::registerDevice);
     }
 
     private boolean openExternalWhenNeeded(Uri uri) {
@@ -286,6 +292,38 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Bu bağlantıyı açacak bir uygulama bulunamadı.", Toast.LENGTH_LONG).show();
         }
         return true;
+    }
+
+
+    private void registerDeviceToken() {
+        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::registerDevice);
+    }
+    private void registerDevice(String token) {
+        if (webView == null || !isTrustedSite(webView.getUrl()) || token == null) return;
+        String quoted = JSONObject.quote(token);
+        webView.evaluateJavascript("(function(){var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n||!n.content)return;fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})}).catch(function(){});})();", null);
+        webView.evaluateJavascript("(function(){if(window.__tesisMemberHook)return;window.__tesisMemberHook=true;document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('tesis-logout-form'))return;e.preventDefault();e.stopImmediatePropagation();if(!confirm('Çıkış yapmak istiyor musunuz?'))return;window.__tesisPendingLogout=f;TesisNative.logout();},true)})();",null);
+    }
+    public class MemberBridge {
+        @JavascriptInterface public void logout() {
+            runOnUiThread(() -> {
+                if (webView == null || !isTrustedSite(webView.getUrl())) return;
+                FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
+                    if (webView == null) return;
+                    String quoted = JSONObject.quote(token);
+                    String script = "(async function(){try{var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n){TesisNative.fail('Üye oturumu bulunamadı');return;}var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){TesisNative.fail('Cihaz kaydı silinemedi: '+r.status);return;}TesisNative.finish();}catch(e){TesisNative.fail('Bağlantı hatası');}})()";
+                    webView.evaluateJavascript(script,null);
+                }).addOnFailureListener(e -> Toast.makeText(MainActivity.this,"Cihaz belirteci okunamadı",Toast.LENGTH_LONG).show());
+            });
+        }
+        @JavascriptInterface public void fail(String message) {
+            runOnUiThread(() -> { if (webView != null && isTrustedSite(webView.getUrl())) Toast.makeText(MainActivity.this,message,Toast.LENGTH_LONG).show(); });
+        }
+        @JavascriptInterface public void finish() {
+            runOnUiThread(() -> FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener(t -> {
+                if (webView != null && isTrustedSite(webView.getUrl())) webView.evaluateJavascript("(function(){if(window.__tesisPendingLogout)HTMLFormElement.prototype.submit.call(window.__tesisPendingLogout)})()",null);
+            }));
+        }
     }
 
     @Override protected void onNewIntent(Intent intent) {
