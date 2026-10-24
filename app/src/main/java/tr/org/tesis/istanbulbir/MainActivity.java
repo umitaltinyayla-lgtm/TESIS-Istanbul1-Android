@@ -67,6 +67,7 @@ public class MainActivity extends Activity {
     private FrameLayout appRoot;
     private int systemInsetTop, systemInsetBottom, systemInsetLeft, systemInsetRight;
     private boolean isMemberPage = false;
+    private int navigationEpoch = 0;
     private static final String RELEASE_PREFS = "tesis_release_state";
     private static final String RELEASE_KEY = "last_started_version";
     private final LinearLayout[] bottomTabs = new LinearLayout[5];
@@ -366,6 +367,10 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                navigationEpoch++;
+                // Oturum acma/cikis yonlendirmesinde menu aninda gizlensin.
+                if (isLoginOrAuthUrl(url) || !isMemberPage)
+                    setMemberNavigationVisible(false);
                 pageLifecycleLoading = isTrustedSite(url);
                 if (pageLifecycleLoading) showPageLoading();
                 else hidePageLoading();
@@ -382,8 +387,8 @@ public class MainActivity extends Activity {
                 pageLifecycleLoading = false;
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
-                if (isTrustedSite(url)) {
-                    refreshMemberNavigation();
+                if (isTrustedSite(url) && !isLoginOrAuthUrl(url)) {
+                    refreshMemberNavigation(url, navigationEpoch);
                     updateActiveBottomTab(url);
                     registerDeviceToken();
                 } else {
@@ -440,20 +445,40 @@ public class MainActivity extends Activity {
         updateNavigationLayout();
     }
 
-    private void refreshMemberNavigation() {
-        if (webView == null || !isTrustedSite(webView.getUrl())) {
+    private static boolean isLoginOrAuthUrl(String url) {
+        if (!isTrustedSite(url)) return false;
+        try {
+            Uri u = Uri.parse(url);
+            String path = u.getPath() == null ? "" : u.getPath().toLowerCase();
+            return u.getQueryParameter("tesis_uye_giris") != null
+                    || path.endsWith("/admin-post.php")
+                    || path.contains("uye-giris")
+                    || path.contains("uye-cikis");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void refreshMemberNavigation(String expectedUrl, int expectedEpoch) {
+        if (webView == null || !isTrustedSite(expectedUrl) || isLoginOrAuthUrl(expectedUrl)) {
             setMemberNavigationVisible(false);
             return;
         }
-        // Sadece oturum acmis uyelerde yer alan sunucu tarafli isaretler.
+        // Giris formu varken bar kesinlikle gosterilmez.
+        // Yetkili sayfada ise sunucunun urettigi logout/FCM isaretine bakilir.
         webView.evaluateJavascript(
             "(function(){" +
+            "var hasLoginForm=!!(document.querySelector('form input[name=\"telefon\"]')" +
+            "&&document.querySelector('form input[name=\"sicil\"]'));" +
+            "if(hasLoginForm)return false;" +
             "var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');" +
             "return !!((n&&n.content)||document.querySelector('.tesis-logout-item'));" +
             "})()",
             active -> {
-                if (webView != null && isTrustedSite(webView.getUrl()))
-                    setMemberNavigationVisible("true".equals(active));
+                if (webView == null || expectedEpoch != navigationEpoch) return;
+                String current = webView.getUrl();
+                if (!expectedUrl.equals(current) || isLoginOrAuthUrl(current)) return;
+                setMemberNavigationVisible("true".equals(active));
             });
     }
 
