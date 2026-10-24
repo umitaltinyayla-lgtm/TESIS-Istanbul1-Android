@@ -583,7 +583,9 @@ public class MainActivity extends Activity {
             LinearLayout selectedArea = new LinearLayout(this);
             selectedArea.setOrientation(LinearLayout.VERTICAL);
             selectedArea.setGravity(Gravity.CENTER);
-            selectedArea.setPadding(dp(5), dp(6), dp(5), dp(6));
+            selectedArea.setPadding(dp(6), dp(6), dp(6), dp(6));
+            // Kisa baslikli sekmeler de digerleri kadar genis vurgulansin.
+            selectedArea.setMinimumWidth(dp(66));
             selectedArea.setClickable(false);
             item.addView(selectedArea, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -682,7 +684,7 @@ public class MainActivity extends Activity {
         expandedMenu.setElevation(dp(7));
         final String[] labels = {"Şube Yönetimi", "Galeri", "Mevzuat", "İletişim"};
         final String[] destinations = {
-            HOMEPAGE + "#yonetim",
+            HOMEPAGE + "sube-yonetimi/",
             HOMEPAGE + "?post_type=tesis_galeri",
             HOMEPAGE + "#mevzuat",
             HOMEPAGE + "#iletisim"
@@ -790,7 +792,8 @@ public class MainActivity extends Activity {
             "'.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button{display:none!important;}'+" +
             "'#tesis-app-account{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#992d3d;color:#fff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:700;line-height:1.15;max-width:148px;min-width:100px;box-sizing:border-box;text-align:center;}'+" +
             "'#tesis-app-account span{max-width:100%;white-space:normal;overflow:visible;overflow-wrap:normal;font-size:11px;}'+" +
-            "'#tesis-app-account b{display:block;font-size:11px;white-space:nowrap;}'+" +
+            "'#tesis-app-account b{display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;white-space:nowrap;}'+" +
+            "'#tesis-app-account b .tesis-app-exit-symbol{font-size:13px;line-height:1;flex:none;}'+" +
             "'}';" +
             "if(!document.getElementById('tesis-app-header-style')){" +
             "var st=document.createElement('style');st.id='tesis-app-header-style';st.textContent=css;document.head.appendChild(st);}" +
@@ -803,13 +806,15 @@ public class MainActivity extends Activity {
             "if(!top){top=document.querySelector('header .header-actions,header .header-right,header .brand-row,header .header-inner,header');}" +
             "if(!top)return;" +
             "var logout=document.querySelector('form.tesis-logout-form');" +
-            "var username=document.querySelector('.tesis-logout-item .tesis-user-name,.tesis-logout-item .user-name,.tesis-member-name,.member-name');" +
+            "var username=document.querySelector('.tesis-logout-item .tesis-logout-name,.tesis-logout-item .tesis-user-name,.tesis-logout-item .user-name,.tesis-member-name,.member-name');" +
             "var item=document.querySelector('.tesis-logout-item');" +
-            "var name=username?username.textContent.trim():(item?item.textContent.replace(/çıkış\s*yap/ig,'').trim():'Üye');" +
+            "var name=username?username.textContent.trim():(item?item.textContent.replace(/çıkış\s*yap/ig,'').replace(/[⎋↻↺⟲⟳↩↪]/g,'').trim():'Üye');" +
             "if(!name)name='Üye';" +
             "var b=document.createElement('button');b.id='tesis-app-account';b.type='button';" +
             "var t=document.createElement('span');t.textContent=name;b.appendChild(t);" +
-            "var x=document.createElement('b');x.textContent='Çıkış Yap';b.appendChild(x);" +
+            "var x=document.createElement('b');" +
+            "var sym=document.createElement('span');sym.className='tesis-app-exit-symbol';sym.textContent='⎋';x.appendChild(sym);" +
+            "x.appendChild(document.createTextNode('Çıkış Yap'));b.appendChild(x);" +
             "b.onclick=function(){var f=document.querySelector('form.tesis-logout-form');" +
             "if(f){if(f.requestSubmit)f.requestSubmit();else f.submit();}" +
             "else{var btn=document.querySelector('.tesis-logout-item button,.tesis-logout-item a');if(btn)btn.click();}};" +
