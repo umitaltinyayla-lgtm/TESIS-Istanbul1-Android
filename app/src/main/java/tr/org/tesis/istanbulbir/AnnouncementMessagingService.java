@@ -22,7 +22,10 @@ public final class AnnouncementMessagingService extends FirebaseMessagingService
     @Override public void onNewToken(String token) {
         super.onNewToken(token);
         Log.i(TAG, "FCM token alindi");
-        MainActivity.subscribeToAnnouncements(this);
+        // Legacy shared topic must never be rejoined when Firebase rotates its token.
+        com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                .unsubscribeFromTopic("tesis_istanbul1_duyuru")
+                .addOnFailureListener(e -> Log.w(TAG, "Eski bildirim kanalindan ayrilma basarisiz", e));
     }
 
     @Override public void onMessageReceived(RemoteMessage message) {
