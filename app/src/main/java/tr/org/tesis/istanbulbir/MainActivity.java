@@ -470,10 +470,11 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Log.w("TESIS", "Uygulama surumu okunamadi", e);
         }
+        final int currentVersion = version;
         SharedPreferences prefs = getSharedPreferences(RELEASE_PREFS, MODE_PRIVATE);
         int previousVersion = prefs.getInt(RELEASE_KEY, -1);
         boolean appWasUpdated = previousVersion >= 0
-                ? previousVersion != version
+                ? previousVersion != currentVersion
                 : (firstInstall > 0 && lastUpdate > firstInstall + 1500);
 
         if (appWasUpdated) {
@@ -487,12 +488,12 @@ public class MainActivity extends Activity {
                 if (webView != null) {
                     webView.clearCache(true);
                     webView.clearHistory();
-                    prefs.edit().putInt(RELEASE_KEY, version).apply();
+                    prefs.edit().putInt(RELEASE_KEY, currentVersion).apply();
                     webView.loadUrl(HOMEPAGE);
                 }
             });
         } else {
-            prefs.edit().putInt(RELEASE_KEY, version).apply();
+            prefs.edit().putInt(RELEASE_KEY, currentVersion).apply();
             if (savedInstanceState != null) {
                 webView.restoreState(savedInstanceState);
                 String opened = getNotificationUrl(getIntent());
