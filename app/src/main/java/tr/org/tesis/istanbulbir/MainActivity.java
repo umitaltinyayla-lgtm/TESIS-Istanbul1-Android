@@ -9,6 +9,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -35,6 +36,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebStorage;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -61,6 +63,12 @@ public class MainActivity extends Activity {
     private int loadingRequest = 0;
     private boolean pageLifecycleLoading = false;
     private LinearLayout bottomNavigation;
+    private FrameLayout pageContent;
+    private FrameLayout appRoot;
+    private int systemInsetTop, systemInsetBottom, systemInsetLeft, systemInsetRight;
+    private boolean isMemberPage = false;
+    private static final String RELEASE_PREFS = "tesis_release_state";
+    private static final String RELEASE_KEY = "last_started_version";
     private final LinearLayout[] bottomTabs = new LinearLayout[5];
     private final ImageView[] bottomTabIcons = new ImageView[5];
     private final TextView[] bottomTabTitles = new TextView[5];
@@ -306,8 +314,11 @@ public class MainActivity extends Activity {
         FrameLayout layout = new FrameLayout(this);
         layout.setBackgroundColor(Color.WHITE);
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -1);
-        contentParams.bottomMargin = dp(NAV_BAR_HEIGHT_DP);
+        // Giris sayfasinda alt navigasyon icin bosluk birakma.
+        contentParams.bottomMargin = 0;
         root.addView(layout, contentParams);
+        pageContent = layout;
+        appRoot = root;
         webView = new WebView(this);
         webView.setBackgroundColor(Color.WHITE);
         layout.addView(webView, new FrameLayout.LayoutParams(-1, -1));
@@ -318,6 +329,7 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
                 -1, dp(NAV_BAR_HEIGHT_DP), Gravity.BOTTOM);
         root.addView(bottomNavigation, bottomParams);
+        bottomNavigation.setVisibility(View.GONE);
         createPageLoadingOverlay(root);
         showNativeSplash(root);
         setContentView(root);
@@ -326,25 +338,11 @@ public class MainActivity extends Activity {
             root.setOnApplyWindowInsetsListener((view, insets) -> {
                 Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
                         | WindowInsets.Type.displayCutout());
-                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) layout.getLayoutParams();
-                int contentBottom = bars.bottom + dp(NAV_BAR_HEIGHT_DP);
-                if (lp.topMargin != bars.top || lp.bottomMargin != contentBottom
-                        || lp.leftMargin != bars.left || lp.rightMargin != bars.right) {
-                    lp.topMargin = bars.top;
-                    lp.bottomMargin = contentBottom;
-                    lp.leftMargin = bars.left;
-                    lp.rightMargin = bars.right;
-                    layout.setLayoutParams(lp);
-                }
-                FrameLayout.LayoutParams navLp =
-                        (FrameLayout.LayoutParams) bottomNavigation.getLayoutParams();
-                if (navLp.bottomMargin != bars.bottom || navLp.leftMargin != bars.left
-                        || navLp.rightMargin != bars.right) {
-                    navLp.bottomMargin = bars.bottom;
-                    navLp.leftMargin = bars.left;
-                    navLp.rightMargin = bars.right;
-                    bottomNavigation.setLayoutParams(navLp);
-                }
+                systemInsetTop = bars.top;
+                systemInsetBottom = bars.bottom;
+                systemInsetLeft = bars.left;
+                systemInsetRight = bars.right;
+                updateNavigationLayout();
                 return insets;
             });
             root.requestApplyInsets();
@@ -385,8 +383,11 @@ public class MainActivity extends Activity {
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
                 if (isTrustedSite(url)) {
+                    refreshMemberNavigation();
                     updateActiveBottomTab(url);
                     registerDeviceToken();
+                } else {
+                    setMemberNavigationVisible(false);
                 }
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -397,13 +398,9 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState);
-            String opened = getNotificationUrl(getIntent());
-            if (!HOMEPAGE.equals(opened)) webView.loadUrl(opened);
-        } else {
-            webView.loadUrl(getNotificationUrl(getIntent()));
-        }
+        // Google Play guncellemesinden sonra eski oturumu kapat;
+        // normal acilis ve cihazda yeni kurulumda oturumu koru.
+        openAfterVersionCheck(savedInstanceState);
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 314);
@@ -412,6 +409,99 @@ public class MainActivity extends Activity {
         FirebaseMessaging.getInstance().unsubscribeFromTopic(TOPIC);
     }
 
+
+
+    private void updateNavigationLayout() {
+        if (pageContent == null || bottomNavigation == null) return;
+        FrameLayout.LayoutParams content =
+                (FrameLayout.LayoutParams) pageContent.getLayoutParams();
+        content.topMargin = systemInsetTop;
+        content.leftMargin = systemInsetLeft;
+        content.rightMargin = systemInsetRight;
+        content.bottomMargin = systemInsetBottom +
+                (isMemberPage ? dp(NAV_BAR_HEIGHT_DP) : 0);
+        pageContent.setLayoutParams(content);
+
+        FrameLayout.LayoutParams nav =
+                (FrameLayout.LayoutParams) bottomNavigation.getLayoutParams();
+        nav.bottomMargin = systemInsetBottom;
+        nav.leftMargin = systemInsetLeft;
+        nav.rightMargin = systemInsetRight;
+        bottomNavigation.setLayoutParams(nav);
+    }
+
+    private void setMemberNavigationVisible(boolean visible) {
+        if (bottomNavigation == null) return;
+        if (isMemberPage == visible &&
+                bottomNavigation.getVisibility() == (visible ? View.VISIBLE : View.GONE))
+            return;
+        isMemberPage = visible;
+        bottomNavigation.setVisibility(visible ? View.VISIBLE : View.GONE);
+        updateNavigationLayout();
+    }
+
+    private void refreshMemberNavigation() {
+        if (webView == null || !isTrustedSite(webView.getUrl())) {
+            setMemberNavigationVisible(false);
+            return;
+        }
+        // Sadece oturum acmis uyelerde yer alan sunucu tarafli isaretler.
+        webView.evaluateJavascript(
+            "(function(){" +
+            "var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');" +
+            "return !!((n&&n.content)||document.querySelector('.tesis-logout-item'));" +
+            "})()",
+            active -> {
+                if (webView != null && isTrustedSite(webView.getUrl()))
+                    setMemberNavigationVisible("true".equals(active));
+            });
+    }
+
+    private void openAfterVersionCheck(Bundle savedInstanceState) {
+        int version = 21;
+        long firstInstall = 0, lastUpdate = 0;
+        try {
+            android.content.pm.PackageInfo pkg =
+                    getPackageManager().getPackageInfo(getPackageName(), 0);
+            version = Build.VERSION.SDK_INT >= 28
+                    ? (int) pkg.getLongVersionCode() : pkg.versionCode;
+            firstInstall = pkg.firstInstallTime;
+            lastUpdate = pkg.lastUpdateTime;
+        } catch (Exception e) {
+            Log.w("TESIS", "Uygulama surumu okunamadi", e);
+        }
+        SharedPreferences prefs = getSharedPreferences(RELEASE_PREFS, MODE_PRIVATE);
+        int previousVersion = prefs.getInt(RELEASE_KEY, -1);
+        boolean appWasUpdated = previousVersion >= 0
+                ? previousVersion != version
+                : (firstInstall > 0 && lastUpdate > firstInstall + 1500);
+
+        if (appWasUpdated) {
+            // Uygulama guncellendi: eski uyenin oturumu ve FCM tokeni kalmasin.
+            setMemberNavigationVisible(false);
+            FirebaseMessaging.getInstance().deleteToken()
+                .addOnFailureListener(e -> Log.w("TESIS-FCM", "Onceki cihaz tokeni kaldirilamadi", e));
+            CookieManager.getInstance().removeAllCookies(done -> {
+                CookieManager.getInstance().flush();
+                WebStorage.getInstance().deleteAllData();
+                if (webView != null) {
+                    webView.clearCache(true);
+                    webView.clearHistory();
+                    prefs.edit().putInt(RELEASE_KEY, version).apply();
+                    webView.loadUrl(HOMEPAGE);
+                }
+            });
+        } else {
+            prefs.edit().putInt(RELEASE_KEY, version).apply();
+            if (savedInstanceState != null) {
+                webView.restoreState(savedInstanceState);
+                String opened = getNotificationUrl(getIntent());
+                if (!HOMEPAGE.equals(opened)) webView.loadUrl(opened);
+            } else {
+                webView.loadUrl(getNotificationUrl(getIntent()));
+            }
+        }
+    }
 
     /** TES-IS uygulamasi icin sabit alt gezinme cubugu. */
     private LinearLayout createBottomNavigation() {
