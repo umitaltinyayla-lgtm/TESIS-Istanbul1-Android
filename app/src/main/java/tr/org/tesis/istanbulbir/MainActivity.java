@@ -304,25 +304,38 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript("(function(){var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');if(!n||!n.content)return;fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})}).catch(function(){});})();", null);
         webView.evaluateJavascript("(function(){if(window.__tesisMemberHook)return;window.__tesisMemberHook=true;document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('tesis-logout-form'))return;e.preventDefault();e.stopImmediatePropagation();if(!confirm('Çıkış yapmak istiyor musunuz?'))return;window.__tesisPendingLogout=f;TesisNative.logout();},true)})();",null);
     }
+    // Device deregistration is best-effort. It must never block website logout.
     public class MemberBridge {
         @JavascriptInterface public void logout() {
             runOnUiThread(() -> {
                 if (webView == null || !isTrustedSite(webView.getUrl())) return;
-                FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
-                    if (webView == null) return;
-                    String quoted = JSONObject.quote(token);
-                    String script = "(async function(){try{var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');if(!n){TesisNative.fail('Üye oturumu bulunamadı');return;}var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){TesisNative.fail('Cihaz kaydı silinemedi: '+r.status);return;}TesisNative.finish();}catch(e){TesisNative.fail('Bağlantı hatası');}})()";
-                    webView.evaluateJavascript(script,null);
-                }).addOnFailureListener(e -> Toast.makeText(MainActivity.this,"Cihaz belirteci okunamadı",Toast.LENGTH_LONG).show());
+                FirebaseMessaging.getInstance().getToken()
+                    .addOnSuccessListener(this::leaveAndLogout)
+                    .addOnFailureListener(e -> leaveAndLogout(""));
             });
         }
-        @JavascriptInterface public void fail(String message) {
-            runOnUiThread(() -> { if (webView != null && isTrustedSite(webView.getUrl())) Toast.makeText(MainActivity.this,message,Toast.LENGTH_LONG).show(); });
-        }
-        @JavascriptInterface public void finish() {
-            runOnUiThread(() -> FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener(t -> {
-                if (webView != null && isTrustedSite(webView.getUrl())) webView.evaluateJavascript("(function(){if(window.__tesisPendingLogout)HTMLFormElement.prototype.submit.call(window.__tesisPendingLogout)})()",null);
-            }));
+        private void leaveAndLogout(String token) {
+            if (webView == null || !isTrustedSite(webView.getUrl())) return;
+            String quotedToken = JSONObject.quote(token == null ? "" : token);
+            String js = "(async function(){" +
+                "var form=window.__tesisPendingLogout;" +
+                "if(!form)return;" +
+                "try{" +
+                "var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');" +
+                "if(n&&n.content&&" + quotedToken + "){" +
+                "var controller=new AbortController();" +
+                "var timeout=setTimeout(function(){controller.abort();},1800);" +
+                "try{await fetch('/wp-json/tesis-mobile/v1/device',{" +
+                "method:'DELETE',credentials:'same-origin',signal:controller.signal," +
+                "headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content}," +
+                "body:JSON.stringify({token:" + quotedToken + "})});}finally{clearTimeout(timeout);}" +
+                "}" +
+                "}catch(e){}" +
+                "HTMLFormElement.prototype.submit.call(form);" +
+                "})();";
+            webView.evaluateJavascript(js, null);
+            FirebaseMessaging.getInstance().deleteToken()
+                .addOnFailureListener(e -> Log.w("TESIS-FCM", "Token silinemedi", e));
         }
     }
 
