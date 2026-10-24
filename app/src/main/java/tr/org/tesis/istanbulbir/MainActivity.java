@@ -403,6 +403,7 @@ public class MainActivity extends Activity {
                 // Oturum acma/cikis yonlendirmesinde menu aninda gizlensin.
                 if (isLoginOrAuthUrl(url) || !isMemberPage)
                     setMemberNavigationVisible(false);
+                hideExpandedMenu();
                 pageLifecycleLoading = isTrustedSite(url);
                 if (pageLifecycleLoading) showPageLoading();
                 else hidePageLoading();
@@ -794,19 +795,22 @@ public class MainActivity extends Activity {
             "if(!n||!n.content)return;" +
             "var old=document.getElementById('tesis-app-account');if(old)return;" +
             "var hamburger=document.querySelector('.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button');" +
+            "if(!hamburger){hamburger=Array.from(document.querySelectorAll('header button,header a')).find(function(el){var label=((el.getAttribute('aria-label')||'')+' '+(el.className||'')).toLowerCase();return /menu|menü|hamburger|toggle/.test(label);});}" +
             "var top=hamburger&&hamburger.parentElement;" +
             "if(!top){top=document.querySelector('header .header-actions,header .header-right,header .brand-row,header .header-inner,header');}" +
             "if(!top)return;" +
             "var logout=document.querySelector('form.tesis-logout-form');" +
             "var username=document.querySelector('.tesis-logout-item .tesis-user-name,.tesis-logout-item .user-name,.tesis-member-name,.member-name');" +
-            "var name=username?username.textContent.trim():'Üye';" +
+            "var item=document.querySelector('.tesis-logout-item');" +
+            "var name=username?username.textContent.trim():(item?item.textContent.replace(/çıkış\s*yap/ig,'').trim():'Üye');" +
+            "if(!name)name='Üye';if(name.length>22)name=name.slice(0,21)+'…';" +
             "var b=document.createElement('button');b.id='tesis-app-account';b.type='button';" +
             "var t=document.createElement('span');t.textContent=name;b.appendChild(t);" +
             "var x=document.createElement('b');x.textContent='Çıkış Yap';b.appendChild(x);" +
             "b.onclick=function(){var f=document.querySelector('form.tesis-logout-form');" +
             "if(f){if(f.requestSubmit)f.requestSubmit();else f.submit();}" +
             "else{var btn=document.querySelector('.tesis-logout-item button,.tesis-logout-item a');if(btn)btn.click();}};" +
-            "top.appendChild(b);" +
+            "if(hamburger){hamburger.style.setProperty('display','none','important');hamburger.insertAdjacentElement('afterend',b);}else{top.appendChild(b);}" +
             "})()";
         webView.evaluateJavascript(js, null);
     }
