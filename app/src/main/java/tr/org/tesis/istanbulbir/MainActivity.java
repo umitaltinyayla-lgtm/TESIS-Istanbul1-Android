@@ -6,6 +6,7 @@ import android.animation.ValueAnimator;
 import android.view.animation.LinearInterpolator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -59,6 +60,13 @@ public class MainActivity extends Activity {
     private final Handler loadingHandler = new Handler(Looper.getMainLooper());
     private int loadingRequest = 0;
     private boolean pageLifecycleLoading = false;
+    private LinearLayout bottomNavigation;
+    private final LinearLayout[] bottomTabs = new LinearLayout[5];
+    private final ImageView[] bottomTabIcons = new ImageView[5];
+    private final TextView[] bottomTabTitles = new TextView[5];
+    private static final int NAV_BAR_HEIGHT_DP = 72;
+    private static final int NAV_HIGHLIGHT = Color.rgb(222, 242, 246);
+    private static final int NAV_DEFAULT = Color.rgb(20, 59, 82);
 
     public static boolean isTrustedSite(String value) {
         if (value == null || value.trim().isEmpty()) return false;
@@ -297,13 +305,19 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(TESIS_BLUE);
         FrameLayout layout = new FrameLayout(this);
         layout.setBackgroundColor(Color.WHITE);
-        root.addView(layout, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -1);
+        contentParams.bottomMargin = dp(NAV_BAR_HEIGHT_DP);
+        root.addView(layout, contentParams);
         webView = new WebView(this);
         webView.setBackgroundColor(Color.WHITE);
         layout.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         layout.addView(progress, new FrameLayout.LayoutParams(-1, 6, Gravity.TOP));
+        bottomNavigation = createBottomNavigation();
+        FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
+                -1, dp(NAV_BAR_HEIGHT_DP), Gravity.BOTTOM);
+        root.addView(bottomNavigation, bottomParams);
         createPageLoadingOverlay(root);
         showNativeSplash(root);
         setContentView(root);
@@ -386,6 +400,132 @@ public class MainActivity extends Activity {
         }
         // V1.11: legacy global-topic subscription is deliberately disabled.
         FirebaseMessaging.getInstance().unsubscribeFromTopic(TOPIC);
+    }
+
+
+    /** TES-IS uygulamasi icin sabit alt gezinme cubugu. */
+    private LinearLayout createBottomNavigation() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER);
+        bar.setElevation(dp(8));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(250, 253, 254));
+        background.setStroke(dp(1), Color.rgb(179, 215, 225));
+        bar.setBackground(background);
+
+        String[] titles = {"Ana Sayfa", "Haberler", "Duyurular", "TİS", "Menü"};
+        int[] iconResources = {
+                R.drawable.tesis_nav_home, R.drawable.tesis_nav_news,
+                R.drawable.tesis_nav_bell, R.drawable.tesis_nav_docs,
+                R.drawable.tesis_nav_menu
+        };
+        for (int i = 0; i < titles.length; i++) {
+            final int selected = i;
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(dp(2), dp(5), dp(2), dp(5));
+            item.setClickable(true);
+            item.setFocusable(true);
+            item.setContentDescription(titles[i]);
+
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(iconResources[i]);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+            iconParams.gravity = Gravity.CENTER_HORIZONTAL;
+            item.addView(icon, iconParams);
+
+            TextView label = new TextView(this);
+            label.setText(titles[i]);
+            label.setTextSize(10);
+            label.setSingleLine(true);
+            label.setGravity(Gravity.CENTER);
+            label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+            labelParams.topMargin = dp(4);
+            item.addView(label, labelParams);
+            item.setOnClickListener(view -> openBottomNavigation(selected));
+
+            bottomTabs[i] = item;
+            bottomTabIcons[i] = icon;
+            bottomTabTitles[i] = label;
+            bar.addView(item, new LinearLayout.LayoutParams(0, -1, 1f));
+        }
+        highlightBottomTab(0);
+        return bar;
+    }
+
+    private void highlightBottomTab(int activeIndex) {
+        for (int i = 0; i < bottomTabs.length; i++) {
+            if (bottomTabs[i] == null) continue;
+            final boolean selected = (i == activeIndex);
+            final int color = selected ? TESIS_BLUE : NAV_DEFAULT;
+            bottomTabIcons[i].setColorFilter(color);
+            bottomTabTitles[i].setTextColor(color);
+            GradientDrawable itemBg = new GradientDrawable();
+            itemBg.setCornerRadius(dp(12));
+            itemBg.setColor(selected ? NAV_HIGHLIGHT : Color.TRANSPARENT);
+            bottomTabs[i].setBackground(itemBg);
+        }
+    }
+
+    private void updateActiveBottomTab(String url) {
+        if (!isTrustedSite(url)) return;
+        try {
+            Uri uri = Uri.parse(url);
+            String path = uri.getPath() == null ? "/" : uri.getPath();
+            String fragment = uri.getFragment();
+            if (path.startsWith("/sube-haberleri/")) highlightBottomTab(1);
+            else if (path.startsWith("/duyuru/")) highlightBottomTab(2);
+            else if ("sozlesmeler".equals(fragment) || path.startsWith("/tis/")) highlightBottomTab(3);
+            else if ("/".equals(path) && (fragment == null || fragment.isEmpty())) highlightBottomTab(0);
+            else highlightBottomTab(4);
+        } catch (Exception ignored) { }
+    }
+
+    private void openBottomNavigation(int index) {
+        if (index == 4) {
+            openMoreMenu();
+            return;
+        }
+        String url = HOMEPAGE;
+        if (index == 1) url = HOMEPAGE + "sube-haberleri/";
+        else if (index == 2) url = HOMEPAGE + "duyuru/";
+        else if (index == 3) url = HOMEPAGE + "#sozlesmeler";
+        navigateInApp(url);
+        highlightBottomTab(index);
+    }
+
+    private void openMoreMenu() {
+        final String[] labels = {"Şube Yönetimi", "Galeri", "Mevzuat", "İletişim"};
+        final String[] targets = {
+            HOMEPAGE + "sube-yonetimi/",
+            HOMEPAGE + "galeri/",
+            HOMEPAGE + "mevzuat/",
+            HOMEPAGE + "#iletisim"
+        };
+        new AlertDialog.Builder(this)
+            .setTitle("TES-İŞ Menü")
+            .setItems(labels, (dialog, which) -> {
+                if (which >= 0 && which < targets.length) {
+                    navigateInApp(targets[which]);
+                    highlightBottomTab(4);
+                }
+            })
+            .setNegativeButton("Kapat", null)
+            .show();
+    }
+
+    private void navigateInApp(String url) {
+        if (webView == null || !isTrustedSite(url)) return;
+        if (url.equals(webView.getUrl())) {
+            webView.scrollTo(0, 0);
+            return;
+        }
+        showPageLoading();
+        webView.loadUrl(url);
     }
 
     private boolean openExternalWhenNeeded(Uri uri) {
