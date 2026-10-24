@@ -337,7 +337,7 @@ public class MainActivity extends Activity {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                if (newProgress >= 100) hidePageLoading();
+                // Burada kapatma: WebView %100 iken DOM/gorseller hala hazirlanabilir.
             }
         });
         webView.setWebViewClient(new WebViewClient() {
@@ -354,7 +354,10 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
-                if (isTrustedSite(url)) registerDeviceToken();
+                if (isTrustedSite(url)) {
+                    registerDeviceToken();
+                    installLoadingHooks();
+                }
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return request.isForMainFrame() && openExternalWhenNeeded(request.getUrl());
@@ -394,6 +397,42 @@ public class MainActivity extends Activity {
     }
 
 
+    /**
+     * Baslama olayini WebView bazen gec bildiriyor. Sayfa ici link/form
+     * tiklamasinda veya kullanicinin tetikledigi asenkron istekte daha once
+     * haberdar ol; 180ms bekleme esigi ve 15sn guvenlik siniri devam eder.
+     */
+    private void installLoadingHooks() {
+        if (webView == null || !isTrustedSite(webView.getUrl())) return;
+        String js = "(function(){" +
+            "if(window.__tesisLoadHooks)return;window.__tesisLoadHooks=true;" +
+            "var pendingAction=0;var pendingRequests=0;" +
+            "document.addEventListener('click',function(e){" +
+            "var a=e.target.closest?e.target.closest('a[href]'):null;" +
+            "pendingAction=Date.now();" +
+            "if(!a||a.hasAttribute('download')||a.target==='_blank')return;" +
+            "var raw=a.getAttribute('href');if(!raw||raw.charAt(0)==='#')return;" +
+            "try{var u=new URL(a.href,location.href);" +
+            "if(u.origin===location.origin&&u.href!==location.href)TesisNative.pageLoading();}catch(err){}" +
+            "},true);" +
+            "document.addEventListener('submit',function(e){" +
+            "pendingAction=Date.now();" +
+            "var f=e.target;if(f&&f.classList&&f.classList.contains('tesis-logout-form'))return;" +
+            "TesisNative.pageLoading();" +
+            "},true);" +
+            // Do not show a spinner for all passive polling. Only recent user-initiated fetch.
+            "if(window.fetch){var originalFetch=window.fetch;" +
+            "window.fetch=function(){var userRequest=(Date.now()-pendingAction)<1200;" +
+            "if(userRequest){pendingRequests++;TesisNative.pageLoading();}" +
+            "var promise;try{promise=originalFetch.apply(this,arguments);}catch(err){" +
+            "if(userRequest&&--pendingRequests<=0)TesisNative.pageLoaded();throw err;}" +
+            "return Promise.resolve(promise).finally(function(){" +
+            "if(userRequest&&--pendingRequests<=0)TesisNative.pageLoaded();" +
+            "});};}" +
+            "})();";
+        webView.evaluateJavascript(js, null);
+    }
+
     private void registerDeviceToken() {
         FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::registerDevice);
     }
@@ -406,6 +445,18 @@ public class MainActivity extends Activity {
     // Device deregistration is best-effort. It must never block website logout.
     private boolean registrationErrorShown = false;
     public class MemberBridge {
+        @JavascriptInterface public void pageLoading() {
+            runOnUiThread(() -> {
+                if (webView != null && isTrustedSite(webView.getUrl())) showPageLoading();
+            });
+        }
+        @JavascriptInterface public void pageLoaded() {
+            runOnUiThread(() -> {
+                if (webView != null && isTrustedSite(webView.getUrl()) && !webView.isLoading()) {
+                    hidePageLoading();
+                }
+            });
+        }
         @JavascriptInterface public void registrationError(String message) {
             android.util.Log.w("TESIS-FCM", "Cihaz kaydi: " + message);
             runOnUiThread(() -> {
