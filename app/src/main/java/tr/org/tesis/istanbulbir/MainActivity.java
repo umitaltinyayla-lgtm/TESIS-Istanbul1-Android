@@ -1,11 +1,13 @@
 package tr.org.tesis.istanbulbir;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
+import android.view.animation.LinearInterpolator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -53,6 +55,7 @@ public class MainActivity extends Activity {
     private final Handler splashHandler = new Handler(Looper.getMainLooper());
     private boolean splashDismissed = false;
     private FrameLayout loadingOverlay;
+    private ObjectAnimator loadingRingAnimator;
     private final Handler loadingHandler = new Handler(Looper.getMainLooper());
     private int loadingRequest = 0;
 
@@ -219,12 +222,31 @@ public class MainActivity extends Activity {
                 dp(138), dp(138), Gravity.CENTER);
         loadingOverlay.addView(circle, circleParams);
 
-        ProgressBar ring = new ProgressBar(this, null, android.R.attr.progressBarStyleLarge);
-        ring.setIndeterminate(true);
-        ring.setIndeterminateTintList(ColorStateList.valueOf(TESIS_BLUE));
+        // Gercek tam boy cember: standart ProgressBar kucuk gorunebiliyor.
+        View ring = new View(this) {
+            private final android.graphics.Paint paint =
+                    new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                paint.setStrokeWidth(dp(5));
+                float gap = dp(5);
+                android.graphics.RectF bounds = new android.graphics.RectF(
+                        gap, gap, getWidth() - gap, getHeight() - gap);
+                paint.setColor(Color.rgb(207, 227, 238));
+                canvas.drawArc(bounds, 0, 360, false, paint);
+                paint.setColor(TESIS_BLUE);
+                canvas.drawArc(bounds, -90, 252, false, paint);
+            }
+        };
         FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
                 dp(130), dp(130), Gravity.CENTER);
         circle.addView(ring, ringParams);
+        loadingRingAnimator = ObjectAnimator.ofFloat(ring, View.ROTATION, 0f, 360f);
+        loadingRingAnimator.setDuration(1100);
+        loadingRingAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        loadingRingAnimator.setInterpolator(new LinearInterpolator());
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.tes_is_gercek_logo);
@@ -246,8 +268,11 @@ public class MainActivity extends Activity {
         loadingHandler.removeCallbacksAndMessages(null);
         // Hizli geciste ekran gereksiz yanip sonmesin.
         loadingHandler.postDelayed(() -> {
-            if (request == loadingRequest && loadingOverlay != null && splashDismissed)
+            if (request == loadingRequest && loadingOverlay != null && splashDismissed) {
                 loadingOverlay.setVisibility(View.VISIBLE);
+                if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
+                    loadingRingAnimator.start();
+            }
         }, 180);
         // Baglanti cevap vermezse ekrani kilitleme.
         loadingHandler.postDelayed(() -> {
@@ -259,6 +284,7 @@ public class MainActivity extends Activity {
         ++loadingRequest;
         loadingHandler.removeCallbacksAndMessages(null);
         if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+        if (loadingRingAnimator != null) loadingRingAnimator.cancel();
     }
 
     @SuppressLint("SetJavaScriptEnabled")
