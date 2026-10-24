@@ -604,7 +604,10 @@ public class MainActivity extends Activity {
             label.setSingleLine(true);
             label.setGravity(Gravity.CENTER);
             label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            labelParams.gravity = Gravity.CENTER_HORIZONTAL;
             labelParams.topMargin = dp(4);
             selectedArea.addView(label, labelParams);
             item.setOnClickListener(view -> openBottomNavigation(selected));
