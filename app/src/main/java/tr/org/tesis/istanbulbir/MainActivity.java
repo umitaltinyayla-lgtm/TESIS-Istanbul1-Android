@@ -790,10 +790,10 @@ public class MainActivity extends Activity {
         String js = "(function(){" +
             "var css='@media(max-width:900px){'+" +
             "'.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button{display:none!important;}'+" +
-            "'#tesis-app-account{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#992d3d;color:#fff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:700;line-height:1.15;max-width:148px;min-width:100px;box-sizing:border-box;text-align:center;}'+" +
-            "'#tesis-app-account span{max-width:100%;white-space:normal;overflow:visible;overflow-wrap:normal;font-size:11px;}'+" +
-            "'#tesis-app-account b{display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;white-space:nowrap;}'+" +
-            "'#tesis-app-account b .tesis-app-exit-symbol{font-size:13px;line-height:1;flex:none;}'+" +
+            "'#tesis-app-account{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:#992d3d;color:#fff;border-radius:7px;padding:3px 5px;font-size:10px;font-weight:700;line-height:1.08;max-width:116px;min-width:88px;box-sizing:border-box;text-align:center;}'+" +
+            "'#tesis-app-account span{max-width:100%;white-space:normal;overflow:visible;overflow-wrap:anywhere;font-size:9px;}'+" +
+            "'#tesis-app-account b{display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;white-space:nowrap;}'+" +
+            "'#tesis-app-account b .tesis-app-exit-symbol{font-size:11px;line-height:1;flex:none;}'+" +
             "'}';" +
             "if(!document.getElementById('tesis-app-header-style')){" +
             "var st=document.createElement('style');st.id='tesis-app-header-style';st.textContent=css;document.head.appendChild(st);}" +
@@ -918,15 +918,35 @@ public class MainActivity extends Activity {
         super.onSaveInstanceState(state);
     }
 
-    @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            // Hizli geri gecisinde logo donmesin; sadece uzun suren
-            // gercek WebView yuklemelerinde onPageStarted tetikler.
-            webView.goBack();
-        } else {
-            hidePageLoading();
-            super.onBackPressed();
+    private boolean isOnMainPage() {
+        if (webView == null) return true;
+        String current = webView.getUrl();
+        if (!isTrustedSite(current)) return false;
+        try {
+            Uri uri = Uri.parse(current);
+            String path = uri.getPath();
+            return (path == null || path.isEmpty() || "/".equals(path))
+                    && (uri.getQuery() == null || uri.getQuery().isEmpty())
+                    && (uri.getFragment() == null || uri.getFragment().isEmpty());
+        } catch (Exception e) {
+            return false;
         }
+    }
+
+    @Override public void onBackPressed() {
+        hideExpandedMenu();
+        if (webView == null || isOnMainPage()) {
+            // Ana Sayfa -> tek geri ile Android uygulamasini kapat.
+            hidePageLoading();
+            finish();
+            return;
+        }
+        // Kac alt sayfaya girilmis olursa olsun, geri gecmisinde dolasma.
+        // Birinci geri -> Ana Sayfa. Bir sonraki geri -> uygulamadan cik.
+        webView.stopLoading();
+        hidePageLoading();
+        highlightBottomTab(0);
+        webView.loadUrl(HOMEPAGE);
     }
     @Override protected void onDestroy() {
         splashHandler.removeCallbacksAndMessages(null);
