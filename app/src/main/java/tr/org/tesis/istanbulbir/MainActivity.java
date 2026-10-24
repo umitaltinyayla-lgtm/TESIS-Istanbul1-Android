@@ -274,7 +274,7 @@ public class MainActivity extends Activity {
                 if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
                     loadingRingAnimator.start();
             }
-        }, 180);
+        }, 300);
         // Baglanti cevap vermezse ekrani kilitleme.
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest) hidePageLoading();
@@ -361,8 +361,8 @@ public class MainActivity extends Activity {
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
                 if (isTrustedSite(url)) {
-                    registerDeviceToken();
                     installLoadingHooks();
+                    registerDeviceToken();
                 }
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -386,7 +386,6 @@ public class MainActivity extends Activity {
         }
         // V1.11: legacy global-topic subscription is deliberately disabled.
         FirebaseMessaging.getInstance().unsubscribeFromTopic(TOPIC);
-        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::registerDevice);
     }
 
     private boolean openExternalWhenNeeded(Uri uri) {
@@ -440,13 +439,36 @@ public class MainActivity extends Activity {
     }
 
     private void registerDeviceToken() {
-        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::registerDevice);
+        // Giris sayfasinda nonce bulunmaz. Bu durumda sessizce atla:
+        // gercek FCM kaydi yalnizca oturum acmis uyenin sayfasinda yapilir.
+        if (webView == null || !isTrustedSite(webView.getUrl())) return;
+        webView.evaluateJavascript(
+            "(function(){var m=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');return !!(m&&m.content);})()",
+            hasNonce -> {
+                if ("true".equals(hasNonce))
+                    FirebaseMessaging.getInstance().getToken()
+                        .addOnSuccessListener(this::registerDevice)
+                        .addOnFailureListener(e -> Log.w("TESIS-FCM", "FCM token alinamadi", e));
+            });
     }
     private void registerDevice(String token) {
         if (webView == null || !isTrustedSite(webView.getUrl()) || token == null) return;
         String quoted = JSONObject.quote(token);
-        webView.evaluateJavascript("(async function(){var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n||!n.content){TesisNative.registrationError('Sayfada cihaz dogrulama anahtari yok');return;}try{var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){var p=await r.json().catch(function(){return {};});TesisNative.registrationError('HTTP '+r.status+' '+(p.code||''));}}catch(e){TesisNative.registrationError('Baglanti hatasi');}})()", null);
-        webView.evaluateJavascript("(function(){if(window.__tesisMemberHook)return;window.__tesisMemberHook=true;document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('tesis-logout-form'))return;e.preventDefault();e.stopImmediatePropagation();if(!confirm('Çıkış yapmak istiyor musunuz?'))return;window.__tesisPendingLogout=f;TesisNative.logout();},true)})();",null);
+        // Oncelikle oturum nonce'unu dogrula. Giris sayfasinda yoksa
+        // normaldir; uyari gosterme. HTTP hatalari ise raporlanir.
+        webView.evaluateJavascript(
+            "(async function(){" +
+            "var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');" +
+            "if(!n||!n.content)return;" +
+            "try{" +
+            "var r=await fetch('/wp-json/tesis-mobile/v1/device',{" +
+            "method:'POST',credentials:'same-origin'," +
+            "headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content}," +
+            "body:JSON.stringify({token:" + quoted + "})});" +
+            "if(!r.ok){var p=await r.json().catch(function(){return {};});" +
+            "TesisNative.registrationError('HTTP '+r.status+' '+(p.code||''));}" +
+            "}catch(e){TesisNative.registrationError('Baglanti hatasi');}" +
+            "})()", null);
     }
     // Device deregistration is best-effort. It must never block website logout.
     private boolean registrationErrorShown = false;
@@ -519,8 +541,14 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        if (webView != null && webView.canGoBack()) {
+            // Back tusu / geri hareketi: tiklama olayi olmadigi icin elle baslat.
+            showPageLoading();
+            webView.goBack();
+        } else {
+            hidePageLoading();
+            super.onBackPressed();
+        }
     }
     @Override protected void onDestroy() {
         splashHandler.removeCallbacksAndMessages(null);
