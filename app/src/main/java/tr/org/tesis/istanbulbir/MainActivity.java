@@ -282,7 +282,7 @@ public class MainActivity extends Activity {
                 if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
                     loadingRingAnimator.start();
             }
-        }, 300);
+        }, 900);
         // Baglanti cevap vermezse ekrani kilitleme.
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest) hidePageLoading();
@@ -327,13 +327,23 @@ public class MainActivity extends Activity {
                 Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
                         | WindowInsets.Type.displayCutout());
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) layout.getLayoutParams();
-                if (lp.topMargin != bars.top || lp.bottomMargin != bars.bottom
+                int contentBottom = bars.bottom + dp(NAV_BAR_HEIGHT_DP);
+                if (lp.topMargin != bars.top || lp.bottomMargin != contentBottom
                         || lp.leftMargin != bars.left || lp.rightMargin != bars.right) {
                     lp.topMargin = bars.top;
-                    lp.bottomMargin = bars.bottom;
+                    lp.bottomMargin = contentBottom;
                     lp.leftMargin = bars.left;
                     lp.rightMargin = bars.right;
                     layout.setLayoutParams(lp);
+                }
+                FrameLayout.LayoutParams navLp =
+                        (FrameLayout.LayoutParams) bottomNavigation.getLayoutParams();
+                if (navLp.bottomMargin != bars.bottom || navLp.leftMargin != bars.left
+                        || navLp.rightMargin != bars.right) {
+                    navLp.bottomMargin = bars.bottom;
+                    navLp.leftMargin = bars.left;
+                    navLp.rightMargin = bars.right;
+                    bottomNavigation.setLayoutParams(navLp);
                 }
                 return insets;
             });
@@ -375,7 +385,7 @@ public class MainActivity extends Activity {
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
                 if (isTrustedSite(url)) {
-                    installLoadingHooks();
+                    updateActiveBottomTab(url);
                     registerDeviceToken();
                 }
             }
@@ -478,7 +488,8 @@ public class MainActivity extends Activity {
             String path = uri.getPath() == null ? "/" : uri.getPath();
             String fragment = uri.getFragment();
             if (path.startsWith("/sube-haberleri/")) highlightBottomTab(1);
-            else if (path.startsWith("/duyuru/")) highlightBottomTab(2);
+            else if (path.startsWith("/tesis_duyuru/") || path.startsWith("/duyuru/")
+                    || "tesis_duyuru".equals(uri.getQueryParameter("post_type"))) highlightBottomTab(2);
             else if ("sozlesmeler".equals(fragment) || path.startsWith("/tis/")) highlightBottomTab(3);
             else if ("/".equals(path) && (fragment == null || fragment.isEmpty())) highlightBottomTab(0);
             else highlightBottomTab(4);
@@ -492,7 +503,7 @@ public class MainActivity extends Activity {
         }
         String url = HOMEPAGE;
         if (index == 1) url = HOMEPAGE + "sube-haberleri/";
-        else if (index == 2) url = HOMEPAGE + "duyuru/";
+        else if (index == 2) url = HOMEPAGE + "?post_type=tesis_duyuru";
         else if (index == 3) url = HOMEPAGE + "#sozlesmeler";
         navigateInApp(url);
         highlightBottomTab(index);
@@ -501,9 +512,9 @@ public class MainActivity extends Activity {
     private void openMoreMenu() {
         final String[] labels = {"Şube Yönetimi", "Galeri", "Mevzuat", "İletişim"};
         final String[] targets = {
-            HOMEPAGE + "sube-yonetimi/",
-            HOMEPAGE + "galeri/",
-            HOMEPAGE + "mevzuat/",
+            HOMEPAGE + "#yonetim",
+            HOMEPAGE + "?post_type=tesis_galeri",
+            HOMEPAGE + "#mevzuat",
             HOMEPAGE + "#iletisim"
         };
         new AlertDialog.Builder(this)
@@ -524,7 +535,7 @@ public class MainActivity extends Activity {
             webView.scrollTo(0, 0);
             return;
         }
-        showPageLoading();
+        // Yalnizca gercek sayfa yuklenmesi uzarsa logo gosterilir.
         webView.loadUrl(url);
     }
 
@@ -541,42 +552,6 @@ public class MainActivity extends Activity {
         return true;
     }
 
-
-    /**
-     * Baslama olayini WebView bazen gec bildiriyor. Sayfa ici link/form
-     * tiklamasinda veya kullanicinin tetikledigi asenkron istekte daha once
-     * haberdar ol; 180ms bekleme esigi ve 15sn guvenlik siniri devam eder.
-     */
-    private void installLoadingHooks() {
-        if (webView == null || !isTrustedSite(webView.getUrl())) return;
-        String js = "(function(){" +
-            "if(window.__tesisLoadHooks)return;window.__tesisLoadHooks=true;" +
-            "var pendingAction=0;var pendingRequests=0;" +
-            "document.addEventListener('click',function(e){" +
-            "var a=e.target.closest?e.target.closest('a[href]'):null;" +
-            "pendingAction=Date.now();" +
-            "if(!a||a.hasAttribute('download')||a.target==='_blank')return;" +
-            "var raw=a.getAttribute('href');if(!raw||raw.charAt(0)==='#')return;" +
-            "try{var u=new URL(a.href,location.href);" +
-            "if(u.origin===location.origin&&u.href!==location.href)TesisNative.pageLoading();}catch(err){}" +
-            "},true);" +
-            "document.addEventListener('submit',function(e){" +
-            "pendingAction=Date.now();" +
-            "var f=e.target;if(f&&f.classList&&f.classList.contains('tesis-logout-form'))return;" +
-            "TesisNative.pageLoading();" +
-            "},true);" +
-            // Do not show a spinner for all passive polling. Only recent user-initiated fetch.
-            "if(window.fetch){var originalFetch=window.fetch;" +
-            "window.fetch=function(){var userRequest=(Date.now()-pendingAction)<1200;" +
-            "if(userRequest){pendingRequests++;TesisNative.pageLoading();}" +
-            "var promise;try{promise=originalFetch.apply(this,arguments);}catch(err){" +
-            "if(userRequest&&--pendingRequests<=0)TesisNative.pageLoaded();throw err;}" +
-            "return Promise.resolve(promise).finally(function(){" +
-            "if(userRequest&&--pendingRequests<=0)TesisNative.pageLoaded();" +
-            "});};}" +
-            "})();";
-        webView.evaluateJavascript(js, null);
-    }
 
     private void registerDeviceToken() {
         // Giris sayfasinda nonce bulunmaz. Bu durumda sessizce atla:
@@ -613,18 +588,6 @@ public class MainActivity extends Activity {
     // Device deregistration is best-effort. It must never block website logout.
     private boolean registrationErrorShown = false;
     public class MemberBridge {
-        @JavascriptInterface public void pageLoading() {
-            runOnUiThread(() -> {
-                if (webView != null && isTrustedSite(webView.getUrl())) showPageLoading();
-            });
-        }
-        @JavascriptInterface public void pageLoaded() {
-            runOnUiThread(() -> {
-                if (webView != null && isTrustedSite(webView.getUrl()) && !pageLifecycleLoading) {
-                    hidePageLoading();
-                }
-            });
-        }
         @JavascriptInterface public void registrationError(String message) {
             android.util.Log.w("TESIS-FCM", "Cihaz kaydi: " + message);
             runOnUiThread(() -> {
@@ -682,8 +645,8 @@ public class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
-            // Back tusu / geri hareketi: tiklama olayi olmadigi icin elle baslat.
-            showPageLoading();
+            // Hizli geri gecisinde logo donmesin; sadece uzun suren
+            // gercek WebView yuklemelerinde onPageStarted tetikler.
             webView.goBack();
         } else {
             hidePageLoading();
