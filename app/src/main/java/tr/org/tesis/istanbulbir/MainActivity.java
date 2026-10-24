@@ -301,11 +301,21 @@ public class MainActivity extends Activity {
     private void registerDevice(String token) {
         if (webView == null || !isTrustedSite(webView.getUrl()) || token == null) return;
         String quoted = JSONObject.quote(token);
-        webView.evaluateJavascript("(function(){var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');if(!n||!n.content)return;fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})}).catch(function(){});})();", null);
+        webView.evaluateJavascript("(async function(){var n=document.querySelector('meta[name=\\\"tesis-device-nonce\\\"]');if(!n||!n.content){TesisNative.registrationError('Sayfada cihaz dogrulama anahtari yok');return;}try{var r=await fetch('/wp-json/tesis-mobile/v1/device',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Tesis-Device-Nonce':n.content},body:JSON.stringify({token:" + quoted + "})});if(!r.ok){var p=await r.json().catch(function(){return {};});TesisNative.registrationError('HTTP '+r.status+' '+(p.code||''));}}catch(e){TesisNative.registrationError('Baglanti hatasi');}})()", null);
         webView.evaluateJavascript("(function(){if(window.__tesisMemberHook)return;window.__tesisMemberHook=true;document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('tesis-logout-form'))return;e.preventDefault();e.stopImmediatePropagation();if(!confirm('Çıkış yapmak istiyor musunuz?'))return;window.__tesisPendingLogout=f;TesisNative.logout();},true)})();",null);
     }
     // Device deregistration is best-effort. It must never block website logout.
+    private boolean registrationErrorShown = false;
     public class MemberBridge {
+        @JavascriptInterface public void registrationError(String message) {
+            android.util.Log.w("TESIS-FCM", "Cihaz kaydi: " + message);
+            runOnUiThread(() -> {
+                if (!registrationErrorShown) {
+                    registrationErrorShown = true;
+                    Toast.makeText(MainActivity.this, "Bildirim cihaz kaydi: " + message, Toast.LENGTH_LONG).show();
+                }
+            });
+        }
         @JavascriptInterface public void logout() {
             runOnUiThread(() -> {
                 if (webView == null || !isTrustedSite(webView.getUrl())) return;
