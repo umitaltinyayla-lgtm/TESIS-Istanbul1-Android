@@ -76,6 +76,10 @@ public class MainActivity extends Activity {
     private final ImageView[] bottomTabIcons = new ImageView[5];
     private final TextView[] bottomTabTitles = new TextView[5];
     private static final int NAV_BAR_HEIGHT_DP = 72;
+    private static final int NAV_RED = Color.rgb(153, 45, 61);
+    private static final int NAV_TURQUOISE = Color.rgb(190, 231, 234);
+    private LinearLayout expandedMenu;
+    private boolean expandedMenuOpen = false;
     private static final int NAV_HIGHLIGHT = Color.rgb(222, 242, 246);
     private static final int NAV_DEFAULT = Color.rgb(20, 59, 82);
 
@@ -351,6 +355,7 @@ public class MainActivity extends Activity {
                 -1, dp(NAV_BAR_HEIGHT_DP), Gravity.BOTTOM);
         root.addView(bottomNavigation, bottomParams);
         bottomNavigation.setVisibility(View.GONE);
+        createExpandedMenu(root);
         createPageLoadingOverlay(root);
         showNativeSplash(root);
         setContentView(root);
@@ -418,6 +423,7 @@ public class MainActivity extends Activity {
                     refreshMemberNavigation(url, navigationEpoch);
                     updateActiveBottomTab(url);
                     installNavigationLoadingTriggers();
+                    installNativeHeader();
                     registerDeviceToken();
                 } else {
                     setMemberNavigationVisible(false);
@@ -470,6 +476,7 @@ public class MainActivity extends Activity {
             return;
         isMemberPage = visible;
         bottomNavigation.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (!visible) hideExpandedMenu();
         updateNavigationLayout();
     }
 
@@ -564,8 +571,8 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER);
         bar.setElevation(dp(8));
         GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.rgb(250, 253, 254));
-        background.setStroke(dp(1), Color.rgb(179, 215, 225));
+        background.setColor(NAV_RED);
+        background.setStroke(dp(1), NAV_RED);
         bar.setBackground(background);
 
         String[] titles = {"Ana Sayfa", "Haberler", "Duyurular", "TİS", "Menü"};
@@ -615,12 +622,12 @@ public class MainActivity extends Activity {
         for (int i = 0; i < bottomTabs.length; i++) {
             if (bottomTabs[i] == null) continue;
             final boolean selected = (i == activeIndex);
-            final int color = selected ? TESIS_BLUE : NAV_DEFAULT;
+            final int color = selected ? TESIS_BLUE : Color.WHITE;
             bottomTabIcons[i].setColorFilter(color);
             bottomTabTitles[i].setTextColor(color);
             GradientDrawable itemBg = new GradientDrawable();
             itemBg.setCornerRadius(dp(12));
-            itemBg.setColor(selected ? NAV_HIGHLIGHT : Color.TRANSPARENT);
+            itemBg.setColor(selected ? NAV_TURQUOISE : Color.TRANSPARENT);
             bottomTabs[i].setBackground(itemBg);
         }
     }
@@ -642,9 +649,10 @@ public class MainActivity extends Activity {
 
     private void openBottomNavigation(int index) {
         if (index == 4) {
-            openMoreMenu();
+            toggleExpandedMenu();
             return;
         }
+        hideExpandedMenu();
         String url = HOMEPAGE;
         if (index == 1) url = HOMEPAGE + "sube-haberleri/";
         else if (index == 2) url = HOMEPAGE + "?post_type=tesis_duyuru";
@@ -653,24 +661,81 @@ public class MainActivity extends Activity {
         highlightBottomTab(index);
     }
 
-    private void openMoreMenu() {
+    private int menuIconResource(int index) {
+        switch (index) {
+            case 0: return android.R.drawable.ic_menu_myplaces;
+            case 1: return android.R.drawable.ic_menu_gallery;
+            case 2: return android.R.drawable.ic_menu_info_details;
+            default: return android.R.drawable.ic_menu_call;
+        }
+    }
+
+    private void createExpandedMenu(FrameLayout root) {
+        expandedMenu = new LinearLayout(this);
+        expandedMenu.setOrientation(LinearLayout.VERTICAL);
+        expandedMenu.setBackgroundColor(NAV_RED);
+        expandedMenu.setVisibility(View.GONE);
+        expandedMenu.setElevation(dp(7));
+        View line = new View(this);
+        line.setBackgroundColor(Color.argb(130, 255, 255, 255));
+        expandedMenu.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
         final String[] labels = {"Şube Yönetimi", "Galeri", "Mevzuat", "İletişim"};
-        final String[] targets = {
+        final String[] destinations = {
             HOMEPAGE + "#yonetim",
             HOMEPAGE + "?post_type=tesis_galeri",
             HOMEPAGE + "#mevzuat",
             HOMEPAGE + "#iletisim"
         };
-        new AlertDialog.Builder(this)
-            .setTitle("TES-İŞ Menü")
-            .setItems(labels, (dialog, which) -> {
-                if (which >= 0 && which < targets.length) {
-                    navigateInApp(targets[which]);
-                    highlightBottomTab(4);
-                }
-            })
-            .setNegativeButton("Kapat", null)
-            .show();
+        for (int i = 0; i < labels.length; i++) {
+            final int choice = i;
+            LinearLayout item = new LinearLayout(this);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            item.setPadding(dp(20), dp(4), dp(14), dp(4));
+            ImageView symbol = new ImageView(this);
+            symbol.setImageResource(menuIconResource(i));
+            symbol.setColorFilter(Color.WHITE);
+            item.addView(symbol, new LinearLayout.LayoutParams(dp(23), dp(23)));
+            TextView label = new TextView(this);
+            label.setText(labels[i]);
+            label.setTextColor(Color.WHITE);
+            label.setTextSize(15);
+            label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+            lp.leftMargin = dp(18);
+            item.addView(label, lp);
+            item.setOnClickListener(v -> {
+                hideExpandedMenu();
+                navigateInApp(destinations[choice]);
+                highlightBottomTab(4);
+            });
+            expandedMenu.addView(item, new LinearLayout.LayoutParams(-1, dp(49)));
+            if (i < labels.length - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(Color.argb(65,255,255,255));
+                expandedMenu.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+            }
+        }
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, dp(201), Gravity.BOTTOM);
+        params.bottomMargin = dp(NAV_BAR_HEIGHT_DP);
+        root.addView(expandedMenu, params);
+    }
+
+    private void toggleExpandedMenu() {
+        if (!isMemberPage || expandedMenu == null) return;
+        expandedMenuOpen = !expandedMenuOpen;
+        FrameLayout.LayoutParams params =
+                (FrameLayout.LayoutParams) expandedMenu.getLayoutParams();
+        params.bottomMargin = systemInsetBottom + dp(NAV_BAR_HEIGHT_DP);
+        params.leftMargin = systemInsetLeft;
+        params.rightMargin = systemInsetRight;
+        expandedMenu.setLayoutParams(params);
+        expandedMenu.setVisibility(expandedMenuOpen ? View.VISIBLE : View.GONE);
+        highlightBottomTab(4);
+    }
+
+    private void hideExpandedMenu() {
+        expandedMenuOpen = false;
+        if (expandedMenu != null) expandedMenu.setVisibility(View.GONE);
     }
 
     private void navigateInApp(String url) {
@@ -711,6 +776,39 @@ public class MainActivity extends Activity {
             "},true);" +
             "})();";
         webView.evaluateJavascript(script, null);
+    }
+
+    /** Sadece Android WebView: mobil hamburger yerine kucuk hesap/cikis. */
+    private void installNativeHeader() {
+        if (webView == null || !isTrustedSite(webView.getUrl())) return;
+        String js = "(function(){" +
+            "var css='@media(max-width:900px){'+" +
+            "'.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button{display:none!important;}'+" +
+            "'#tesis-app-account{display:flex!important;align-items:center;gap:5px;background:#992d3d;color:#fff;border-radius:9px;padding:5px 7px;font-size:10px;font-weight:700;line-height:1.15;max-width:132px;box-sizing:border-box;text-align:center;}'+" +
+            "'#tesis-app-account span{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'+" +
+            "'#tesis-app-account b{font-size:10px;white-space:nowrap;}'+" +
+            "'}';" +
+            "if(!document.getElementById('tesis-app-header-style')){" +
+            "var st=document.createElement('style');st.id='tesis-app-header-style';st.textContent=css;document.head.appendChild(st);}" +
+            "var n=document.querySelector('meta[name=\"tesis-device-nonce\"]');" +
+            "if(!n||!n.content)return;" +
+            "var old=document.getElementById('tesis-app-account');if(old)return;" +
+            "var hamburger=document.querySelector('.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button');" +
+            "var top=hamburger&&hamburger.parentElement;" +
+            "if(!top){top=document.querySelector('header .header-actions,header .header-right,header .brand-row,header .header-inner,header');}" +
+            "if(!top)return;" +
+            "var logout=document.querySelector('form.tesis-logout-form');" +
+            "var username=document.querySelector('.tesis-logout-item .tesis-user-name,.tesis-logout-item .user-name,.tesis-member-name,.member-name');" +
+            "var name=username?username.textContent.trim():'Üye';" +
+            "var b=document.createElement('button');b.id='tesis-app-account';b.type='button';" +
+            "var t=document.createElement('span');t.textContent=name;b.appendChild(t);" +
+            "var x=document.createElement('b');x.textContent='Çıkış Yap';b.appendChild(x);" +
+            "b.onclick=function(){var f=document.querySelector('form.tesis-logout-form');" +
+            "if(f){f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));}" +
+            "else{var btn=document.querySelector('.tesis-logout-item button,.tesis-logout-item a');if(btn)btn.click();}};" +
+            "top.appendChild(b);" +
+            "})()";
+        webView.evaluateJavascript(js, null);
     }
 
     private void registerDeviceToken() {
