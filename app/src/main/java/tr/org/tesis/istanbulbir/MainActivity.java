@@ -61,6 +61,8 @@ public class MainActivity extends Activity {
     private ObjectAnimator loadingRingAnimator;
     private final Handler loadingHandler = new Handler(Looper.getMainLooper());
     private int loadingRequest = 0;
+    private boolean navigationPending = false;
+    private long visibleSince = 0L;
     private boolean pageLifecycleLoading = false;
     private LinearLayout bottomNavigation;
     private FrameLayout pageContent;
@@ -281,28 +283,46 @@ public class MainActivity extends Activity {
     }
 
     private void showPageLoading() {
+        showPageLoading(false);
+    }
+
+    private void showPageLoading(boolean fromBottomMenu) {
         if (loadingOverlay == null || !splashDismissed) return;
+        if (!navigationPending) navigationPending = true;
         final int request = ++loadingRequest;
         loadingHandler.removeCallbacksAndMessages(null);
-        // Hizli geciste ekran gereksiz yanip sonmesin.
+        // Alt menuden secilen hedef hemen tepkili olsun; diger sayfalarda
+        // kisa gecislerde yanip sonmemesi icin biraz bekle.
+        long delay = fromBottomMenu ? 0L : 200L;
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest && loadingOverlay != null && splashDismissed) {
-                loadingOverlay.setVisibility(View.VISIBLE);
+                if (loadingOverlay.getVisibility() != View.VISIBLE) {
+                    visibleSince = android.os.SystemClock.uptimeMillis();
+                    loadingOverlay.setVisibility(View.VISIBLE);
+                }
                 if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
                     loadingRingAnimator.start();
             }
-        }, 300);
-        // Baglanti cevap vermezse ekrani kilitleme.
+        }, delay);
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest) hidePageLoading();
-        }, 15000);
+        }, 15000L);
     }
 
     private void hidePageLoading() {
-        ++loadingRequest;
+        navigationPending = false;
+        final int request = ++loadingRequest;
         loadingHandler.removeCallbacksAndMessages(null);
-        if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
-        if (loadingRingAnimator != null) loadingRingAnimator.cancel();
+        if (loadingOverlay == null) return;
+        // Tam acilis: gozun animasyonu gorebilmesi icin 300ms minimum.
+        long elapsed = android.os.SystemClock.uptimeMillis() - visibleSince;
+        long remaining = loadingOverlay.getVisibility() == View.VISIBLE
+                ? Math.max(0L, 300L - elapsed) : 0L;
+        loadingHandler.postDelayed(() -> {
+            if (request != loadingRequest) return;
+            loadingOverlay.setVisibility(View.GONE);
+            if (loadingRingAnimator != null) loadingRingAnimator.cancel();
+        }, remaining);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -350,6 +370,8 @@ public class MainActivity extends Activity {
         }
 
         WebSettings settings = webView.getSettings();
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        if (Build.VERSION.SDK_INT >= 23) settings.setOffscreenPreRaster(true);
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
@@ -361,7 +383,12 @@ public class MainActivity extends Activity {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                // Sadece sayfa yuklenmesi gercekten bittiginde kapanir.
+                if (isTrustedSite(view.getUrl()) && newProgress > 0 && newProgress < 100
+                        && splashDismissed && loadingOverlay != null
+                        && loadingOverlay.getVisibility() != View.VISIBLE) {
+                    // Ustteki yukleme cubugu ilerlerken logo da gercekten gorunsun.
+                    showPageLoading(true);
+                }
             }
         });
         webView.setWebViewClient(new WebViewClient() {
@@ -652,7 +679,8 @@ public class MainActivity extends Activity {
             webView.scrollTo(0, 0);
             return;
         }
-        // Yalnizca gercek sayfa yuklenmesi uzarsa logo gosterilir.
+        // Butona tiklandiginda aninda gorsel yanit ver.
+        showPageLoading(true);
         webView.loadUrl(url);
     }
 
