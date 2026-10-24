@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
     private ObjectAnimator loadingRingAnimator;
     private final Handler loadingHandler = new Handler(Looper.getMainLooper());
     private int loadingRequest = 0;
+    private boolean pageLifecycleLoading = false;
 
     public static boolean isTrustedSite(String value) {
         if (value == null || value.trim().isEmpty()) return false;
@@ -343,15 +344,20 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                if (isTrustedSite(url)) showPageLoading();
+                pageLifecycleLoading = isTrustedSite(url);
+                if (pageLifecycleLoading) showPageLoading();
                 else hidePageLoading();
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (request.isForMainFrame()) hidePageLoading();
+                if (request.isForMainFrame()) {
+                    pageLifecycleLoading = false;
+                    hidePageLoading();
+                }
                 super.onReceivedError(view, request, error);
             }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                pageLifecycleLoading = false;
                 hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
                 if (isTrustedSite(url)) {
@@ -452,7 +458,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void pageLoaded() {
             runOnUiThread(() -> {
-                if (webView != null && isTrustedSite(webView.getUrl()) && !webView.isLoading()) {
+                if (webView != null && isTrustedSite(webView.getUrl()) && !pageLifecycleLoading) {
                     hidePageLoading();
                 }
             });
