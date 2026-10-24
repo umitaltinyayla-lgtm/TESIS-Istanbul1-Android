@@ -73,6 +73,7 @@ public class MainActivity extends Activity {
     private static final String RELEASE_PREFS = "tesis_release_state";
     private static final String RELEASE_KEY = "last_started_version";
     private final LinearLayout[] bottomTabs = new LinearLayout[5];
+    private final LinearLayout[] bottomSelectionBackgrounds = new LinearLayout[5];
     private final ImageView[] bottomTabIcons = new ImageView[5];
     private final TextView[] bottomTabTitles = new TextView[5];
     private static final int NAV_BAR_HEIGHT_DP = 72;
@@ -292,21 +293,19 @@ public class MainActivity extends Activity {
 
     private void showPageLoading(boolean fromBottomMenu) {
         if (loadingOverlay == null || !splashDismissed) return;
-        if (!navigationPending) navigationPending = true;
+        // Ayni WebView gecisi icin her ilerleme olayinda sureyi bastan baslatma.
+        if (navigationPending) return;
+        navigationPending = true;
         final int request = ++loadingRequest;
         loadingHandler.removeCallbacksAndMessages(null);
-        // Alt menuden secilen hedef hemen tepkili olsun; diger sayfalarda
-        // kisa gecislerde yanip sonmemesi icin biraz bekle.
-        long delay = fromBottomMenu ? 0L : 200L;
+        // Gercekten uzun suren yuklemede donsun, hizli sayfaya gecisi tutmasin.
+        final long delay = fromBottomMenu ? 120L : 180L;
         loadingHandler.postDelayed(() -> {
-            if (request == loadingRequest && loadingOverlay != null && splashDismissed) {
-                if (loadingOverlay.getVisibility() != View.VISIBLE) {
-                    visibleSince = android.os.SystemClock.uptimeMillis();
-                    loadingOverlay.setVisibility(View.VISIBLE);
-                }
-                if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
-                    loadingRingAnimator.start();
-            }
+            if (request != loadingRequest || !navigationPending
+                    || loadingOverlay == null || !splashDismissed) return;
+            loadingOverlay.setVisibility(View.VISIBLE);
+            if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
+                loadingRingAnimator.start();
         }, delay);
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest) hidePageLoading();
@@ -315,18 +314,11 @@ public class MainActivity extends Activity {
 
     private void hidePageLoading() {
         navigationPending = false;
-        final int request = ++loadingRequest;
+        ++loadingRequest;
         loadingHandler.removeCallbacksAndMessages(null);
-        if (loadingOverlay == null) return;
-        // Tam acilis: gozun animasyonu gorebilmesi icin 300ms minimum.
-        long elapsed = android.os.SystemClock.uptimeMillis() - visibleSince;
-        long remaining = loadingOverlay.getVisibility() == View.VISIBLE
-                ? Math.max(0L, 300L - elapsed) : 0L;
-        loadingHandler.postDelayed(() -> {
-            if (request != loadingRequest) return;
-            loadingOverlay.setVisibility(View.GONE);
-            if (loadingRingAnimator != null) loadingRingAnimator.cancel();
-        }, remaining);
+        // Yuklenen sayfayi bekletmeden ac: eskiden 300ms fazladan tutuyordu.
+        if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+        if (loadingRingAnimator != null) loadingRingAnimator.cancel();
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -390,7 +382,7 @@ public class MainActivity extends Activity {
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
                 if (isTrustedSite(view.getUrl()) && newProgress > 0 && newProgress < 100
                         && splashDismissed && loadingOverlay != null
-                        && loadingOverlay.getVisibility() != View.VISIBLE) {
+                        && !navigationPending) {
                     // Ustteki yukleme cubugu ilerlerken logo da gercekten gorunsun.
                     showPageLoading(true);
                 }
@@ -587,7 +579,14 @@ public class MainActivity extends Activity {
             LinearLayout item = new LinearLayout(this);
             item.setOrientation(LinearLayout.VERTICAL);
             item.setGravity(Gravity.CENTER);
-            item.setPadding(dp(2), dp(5), dp(2), dp(5));
+            item.setPadding(0, 0, 0, 0);
+            LinearLayout selectedArea = new LinearLayout(this);
+            selectedArea.setOrientation(LinearLayout.VERTICAL);
+            selectedArea.setGravity(Gravity.CENTER);
+            selectedArea.setPadding(dp(5), dp(6), dp(5), dp(6));
+            selectedArea.setClickable(false);
+            item.addView(selectedArea, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             item.setClickable(true);
             item.setFocusable(true);
             item.setContentDescription(titles[i]);
@@ -597,7 +596,7 @@ public class MainActivity extends Activity {
             icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
             LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
             iconParams.gravity = Gravity.CENTER_HORIZONTAL;
-            item.addView(icon, iconParams);
+            selectedArea.addView(icon, iconParams);
 
             TextView label = new TextView(this);
             label.setText(titles[i]);
@@ -607,10 +606,11 @@ public class MainActivity extends Activity {
             label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
             labelParams.topMargin = dp(4);
-            item.addView(label, labelParams);
+            selectedArea.addView(label, labelParams);
             item.setOnClickListener(view -> openBottomNavigation(selected));
 
             bottomTabs[i] = item;
+            bottomSelectionBackgrounds[i] = selectedArea;
             bottomTabIcons[i] = icon;
             bottomTabTitles[i] = label;
             bar.addView(item, new LinearLayout.LayoutParams(0, -1, 1f));
@@ -629,7 +629,7 @@ public class MainActivity extends Activity {
             GradientDrawable itemBg = new GradientDrawable();
             itemBg.setCornerRadius(dp(12));
             itemBg.setColor(selected ? NAV_TURQUOISE : Color.TRANSPARENT);
-            bottomTabs[i].setBackground(itemBg);
+            bottomSelectionBackgrounds[i].setBackground(itemBg);
         }
     }
 
@@ -677,9 +677,6 @@ public class MainActivity extends Activity {
         expandedMenu.setBackgroundColor(NAV_RED);
         expandedMenu.setVisibility(View.GONE);
         expandedMenu.setElevation(dp(7));
-        View line = new View(this);
-        line.setBackgroundColor(Color.argb(130, 255, 255, 255));
-        expandedMenu.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
         final String[] labels = {"Şube Yönetimi", "Galeri", "Mevzuat", "İletişim"};
         final String[] destinations = {
             HOMEPAGE + "#yonetim",
@@ -716,7 +713,10 @@ public class MainActivity extends Activity {
                 expandedMenu.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
             }
         }
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, dp(201), Gravity.BOTTOM);
+        View strongDivider = new View(this);
+        strongDivider.setBackgroundColor(NAV_TURQUOISE);
+        expandedMenu.addView(strongDivider, new LinearLayout.LayoutParams(-1, dp(3)));
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, dp(202), Gravity.BOTTOM);
         params.bottomMargin = dp(NAV_BAR_HEIGHT_DP);
         root.addView(expandedMenu, params);
     }
@@ -785,9 +785,9 @@ public class MainActivity extends Activity {
         String js = "(function(){" +
             "var css='@media(max-width:900px){'+" +
             "'.menu-toggle,.mobile-menu-toggle,.hamburger,.hamburger-btn,.nav-toggle,.site-menu-toggle,.mobile-nav-toggle,.header-toggle,.menu-button,.mobile-menu-button{display:none!important;}'+" +
-            "'#tesis-app-account{display:flex!important;align-items:center;gap:5px;background:#992d3d;color:#fff;border-radius:9px;padding:5px 7px;font-size:10px;font-weight:700;line-height:1.15;max-width:132px;box-sizing:border-box;text-align:center;}'+" +
-            "'#tesis-app-account span{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'+" +
-            "'#tesis-app-account b{font-size:10px;white-space:nowrap;}'+" +
+            "'#tesis-app-account{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#992d3d;color:#fff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:700;line-height:1.15;max-width:148px;min-width:100px;box-sizing:border-box;text-align:center;}'+" +
+            "'#tesis-app-account span{max-width:100%;white-space:normal;overflow:visible;overflow-wrap:normal;font-size:11px;}'+" +
+            "'#tesis-app-account b{display:block;font-size:11px;white-space:nowrap;}'+" +
             "'}';" +
             "if(!document.getElementById('tesis-app-header-style')){" +
             "var st=document.createElement('style');st.id='tesis-app-header-style';st.textContent=css;document.head.appendChild(st);}" +
@@ -803,7 +803,7 @@ public class MainActivity extends Activity {
             "var username=document.querySelector('.tesis-logout-item .tesis-user-name,.tesis-logout-item .user-name,.tesis-member-name,.member-name');" +
             "var item=document.querySelector('.tesis-logout-item');" +
             "var name=username?username.textContent.trim():(item?item.textContent.replace(/çıkış\s*yap/ig,'').trim():'Üye');" +
-            "if(!name)name='Üye';if(name.length>22)name=name.slice(0,21)+'…';" +
+            "if(!name)name='Üye';" +
             "var b=document.createElement('button');b.id='tesis-app-account';b.type='button';" +
             "var t=document.createElement('span');t.textContent=name;b.appendChild(t);" +
             "var x=document.createElement('b');x.textContent='Çıkış Yap';b.appendChild(x);" +
