@@ -804,7 +804,7 @@ public class MainActivity extends Activity {
             "var t=document.createElement('span');t.textContent=name;b.appendChild(t);" +
             "var x=document.createElement('b');x.textContent='Çıkış Yap';b.appendChild(x);" +
             "b.onclick=function(){var f=document.querySelector('form.tesis-logout-form');" +
-            "if(f){f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));}" +
+            "if(f){if(f.requestSubmit)f.requestSubmit();else f.submit();}" +
             "else{var btn=document.querySelector('.tesis-logout-item button,.tesis-logout-item a');if(btn)btn.click();}};" +
             "top.appendChild(b);" +
             "})()";
