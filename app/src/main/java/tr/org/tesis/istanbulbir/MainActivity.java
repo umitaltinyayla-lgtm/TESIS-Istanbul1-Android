@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -51,6 +52,9 @@ public class MainActivity extends Activity {
     private FrameLayout splashOverlay;
     private final Handler splashHandler = new Handler(Looper.getMainLooper());
     private boolean splashDismissed = false;
+    private FrameLayout loadingOverlay;
+    private final Handler loadingHandler = new Handler(Looper.getMainLooper());
+    private int loadingRequest = 0;
 
     public static boolean isTrustedSite(String value) {
         if (value == null || value.trim().isEmpty()) return false;
@@ -200,6 +204,63 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+
+    // Tum sayfa gecislerinde, giriste ve duyuru/galeri acilisinda gosterilen
+    // yazisiz TES-IS logolu bekleme halkasi. Ilk splash ekrani korunur.
+    private void createPageLoadingOverlay(FrameLayout root) {
+        loadingOverlay = new FrameLayout(this);
+        loadingOverlay.setBackgroundColor(Color.argb(242, 247, 252, 254));
+        loadingOverlay.setClickable(true);
+        loadingOverlay.setVisibility(View.GONE);
+        root.addView(loadingOverlay, new FrameLayout.LayoutParams(-1, -1));
+
+        FrameLayout circle = new FrameLayout(this);
+        FrameLayout.LayoutParams circleParams = new FrameLayout.LayoutParams(
+                dp(138), dp(138), Gravity.CENTER);
+        loadingOverlay.addView(circle, circleParams);
+
+        ProgressBar ring = new ProgressBar(this, null, android.R.attr.progressBarStyleLarge);
+        ring.setIndeterminate(true);
+        ring.setIndeterminateTintList(ColorStateList.valueOf(TESIS_BLUE));
+        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
+                dp(130), dp(130), Gravity.CENTER);
+        circle.addView(ring, ringParams);
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.tes_is_gercek_logo);
+        logo.setContentDescription("TES-İŞ");
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        GradientDrawable white = new GradientDrawable();
+        white.setShape(GradientDrawable.OVAL);
+        white.setColor(Color.WHITE);
+        logo.setBackground(white);
+        logo.setPadding(dp(7), dp(7), dp(7), dp(7));
+        FrameLayout.LayoutParams logoParams = new FrameLayout.LayoutParams(
+                dp(88), dp(88), Gravity.CENTER);
+        circle.addView(logo, logoParams);
+    }
+
+    private void showPageLoading() {
+        if (loadingOverlay == null || !splashDismissed) return;
+        final int request = ++loadingRequest;
+        loadingHandler.removeCallbacksAndMessages(null);
+        // Hizli geciste ekran gereksiz yanip sonmesin.
+        loadingHandler.postDelayed(() -> {
+            if (request == loadingRequest && loadingOverlay != null && splashDismissed)
+                loadingOverlay.setVisibility(View.VISIBLE);
+        }, 180);
+        // Baglanti cevap vermezse ekrani kilitleme.
+        loadingHandler.postDelayed(() -> {
+            if (request == loadingRequest) hidePageLoading();
+        }, 15000);
+    }
+
+    private void hidePageLoading() {
+        ++loadingRequest;
+        loadingHandler.removeCallbacksAndMessages(null);
+        if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -216,6 +277,7 @@ public class MainActivity extends Activity {
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         layout.addView(progress, new FrameLayout.LayoutParams(-1, 6, Gravity.TOP));
+        createPageLoadingOverlay(root);
         showNativeSplash(root);
         setContentView(root);
 
@@ -249,11 +311,22 @@ public class MainActivity extends Activity {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                if (newProgress >= 100) hidePageLoading();
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (isTrustedSite(url)) showPageLoading();
+                else hidePageLoading();
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (request.isForMainFrame()) hidePageLoading();
+                super.onReceivedError(view, request, error);
+            }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                hidePageLoading();
                 if (!splashDismissed) waitForSiteLogos(view, 0);
                 if (isTrustedSite(url)) registerDeviceToken();
             }
@@ -368,6 +441,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onDestroy() {
         splashHandler.removeCallbacksAndMessages(null);
+        hidePageLoading();
         if (webView != null) { webView.destroy(); webView = null; }
         super.onDestroy();
     }
