@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
                 if (loadingRingAnimator != null && !loadingRingAnimator.isStarted())
                     loadingRingAnimator.start();
             }
-        }, 900);
+        }, 300);
         // Baglanti cevap vermezse ekrani kilitleme.
         loadingHandler.postDelayed(() -> {
             if (request == loadingRequest) hidePageLoading();
@@ -361,7 +361,7 @@ public class MainActivity extends Activity {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                // Burada kapatma: WebView %100 iken DOM/gorseller hala hazirlanabilir.
+                // Sadece sayfa yuklenmesi gercekten bittiginde kapanir.
             }
         });
         webView.setWebViewClient(new WebViewClient() {
@@ -390,6 +390,7 @@ public class MainActivity extends Activity {
                 if (isTrustedSite(url) && !isLoginOrAuthUrl(url)) {
                     refreshMemberNavigation(url, navigationEpoch);
                     updateActiveBottomTab(url);
+                    installNavigationLoadingTriggers();
                     registerDeviceToken();
                 } else {
                     setMemberNavigationVisible(false);
@@ -669,6 +670,21 @@ public class MainActivity extends Activity {
     }
 
 
+    private void installNavigationLoadingTriggers() {
+        if (webView == null || !isTrustedSite(webView.getUrl())) return;
+        String script = "(function(){if(window.__tesisNavLoadingBound)return;" +
+            "window.__tesisNavLoadingBound=true;" +
+            "document.addEventListener('submit',function(e){" +
+            "var form=e.target;if(!form||!form.matches)return;" +
+            "var isLogin=!!(form.querySelector('input[name=\"sicil\"]')" +
+            "&&form.querySelector('input[name=\"telefon\"]'));" +
+            "var isLogout=form.classList.contains('tesis-logout-form');" +
+            "if(isLogin||isLogout)TesisNative.startNavigationLoading();" +
+            "},true);" +
+            "})();";
+        webView.evaluateJavascript(script, null);
+    }
+
     private void registerDeviceToken() {
         // Giris sayfasinda nonce bulunmaz. Bu durumda sessizce atla:
         // gercek FCM kaydi yalnizca oturum acmis uyenin sayfasinda yapilir.
@@ -704,6 +720,11 @@ public class MainActivity extends Activity {
     // Device deregistration is best-effort. It must never block website logout.
     private boolean registrationErrorShown = false;
     public class MemberBridge {
+        @JavascriptInterface public void startNavigationLoading() {
+            runOnUiThread(() -> {
+                if (webView != null && isTrustedSite(webView.getUrl())) showPageLoading();
+            });
+        }
         @JavascriptInterface public void registrationError(String message) {
             android.util.Log.w("TESIS-FCM", "Cihaz kaydi: " + message);
             runOnUiThread(() -> {
