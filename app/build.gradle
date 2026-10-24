@@ -10,8 +10,8 @@ android {
         applicationId 'tr.org.tesis.istanbulbir.uygulama'
         minSdk 24
         targetSdk 36
-        versionCode 25
-        versionName '1.12.3'
+        versionCode 26
+        versionName '1.12.4'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
