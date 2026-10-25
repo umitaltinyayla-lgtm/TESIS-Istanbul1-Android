@@ -63,50 +63,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    // FCM cihaz kaydi ag gecislerinde gecici olarak basarisiz olabilir.
-    // Kullaniciya hata Toast'u gostermek yerine denemeleri tekillestir ve
-    // kisa araliklarla tekrar dene. Firebase SDK da aboneligi kalici saklar.
-    private static final java.util.concurrent.atomic.AtomicBoolean fcmSubscriptionRunning =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
-    private static final long[] FCM_RETRY_DELAYS_MS = {5_000L, 20_000L, 60_000L};
-    private static final Handler fcmHandler = new Handler(Looper.getMainLooper());
-
     public static void subscribeToAnnouncements(Context context) {
-        subscribeToAnnouncements(context.getApplicationContext(), 0);
-    }
-
-    private static void subscribeToAnnouncements(Context appContext, int attempt) {
-        if (FirebaseApp.getApps(appContext).isEmpty()) {
-            Log.w("TESIS-FCM", "Firebase baslatilmamis; konu aboneligi ertelendi");
-            return;
-        }
-        if (!fcmSubscriptionRunning.compareAndSet(false, true)) return;
-
-        try {
-            FirebaseMessaging.getInstance().subscribeToTopic(TOPIC)
-                    .addOnCompleteListener(task -> {
-                        fcmSubscriptionRunning.set(false);
-                        if (task.isSuccessful()) {
-                            Log.i("TESIS-FCM", "Duyuru aboneligi basarili");
-                        } else {
-                            Log.w("TESIS-FCM", "Duyuru aboneligi gecici olarak basarisiz"
-                                    + " (deneme " + (attempt + 1) + ")", task.getException());
-                            if (attempt < FCM_RETRY_DELAYS_MS.length) {
-                                fcmHandler.postDelayed(
-                                        () -> subscribeToAnnouncements(appContext, attempt + 1),
-                                        FCM_RETRY_DELAYS_MS[attempt]);
-                            }
-                        }
-                    });
-        } catch (RuntimeException e) {
-            fcmSubscriptionRunning.set(false);
-            Log.w("TESIS-FCM", "Duyuru aboneligi baslatilamadi", e);
-            if (attempt < FCM_RETRY_DELAYS_MS.length) {
-                fcmHandler.postDelayed(
-                        () -> subscribeToAnnouncements(appContext, attempt + 1),
-                        FCM_RETRY_DELAYS_MS[attempt]);
-            }
-        }
+        if (FirebaseApp.getApps(context).isEmpty()) return;
+        FirebaseMessaging.getInstance().subscribeToTopic(TOPIC)
+                .addOnFailureListener(e -> Log.w("TESIS-FCM", "Duyuru aboneligi basarisiz", e));
     }
 
     private static String getNotificationUrl(Intent intent) {
