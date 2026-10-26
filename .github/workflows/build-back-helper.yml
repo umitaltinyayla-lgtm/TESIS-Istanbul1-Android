@@ -1,0 +1,42 @@
+name: Build Android Back Navigation Helper DEX
+
+on:
+  push:
+    branches:
+      - feature/three-step-back-navigation
+  workflow_dispatch:
+
+jobs:
+  compile-helper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated BackActivity class for current Play bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/stubs/tr/org/tesis/istanbulbir out
+          cat > /tmp/stubs/tr/org/tesis/istanbulbir/MainActivity.java <<'JAVA'
+          package tr.org.tesis.istanbulbir;
+          public class MainActivity extends android.app.Activity {}
+          JAVA
+          SDK_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
+          javac -source 8 -target 8 -encoding UTF-8 \
+            -cp "$SDK_JAR" -d /tmp/helper_classes \
+            /tmp/stubs/tr/org/tesis/istanbulbir/MainActivity.java \
+            back-nav-patch/src/tr/org/tesis/istanbulbir/BackActivity.java
+          D8_BIN="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name d8 | sort -V | tail -1)"
+          test -n "$D8_BIN"
+          "$D8_BIN" --min-api 24 --lib "$SDK_JAR" \
+            --output out \
+            /tmp/helper_classes/tr/org/tesis/istanbulbir/BackActivity.class
+          test -s out/classes.dex
+          sha256sum out/classes.dex
+      - name: Store isolated dex
+        uses: actions/upload-artifact@v4
+        with:
+          name: back-activity-classes2-dex
+          path: out/classes.dex
+          if-no-files-found: error
