@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -49,6 +50,24 @@ public class MainActivity extends Activity {
     private FrameLayout splashOverlay;
     private final Handler splashHandler = new Handler(Looper.getMainLooper());
     private boolean splashDismissed = false;
+    private static final long BACK_SEQUENCE_WINDOW_MS = 2800L;
+    private int backPressCount = 0;
+    private long lastBackPressMs = 0L;
+    private boolean backInitiatedNavigation = false;
+    private boolean clearHistoryOnHome = false;
+
+    private void resetBackSequence() {
+        backPressCount = 0;
+        lastBackPressMs = 0L;
+    }
+
+    private boolean isHomepageUrl(String url) {
+        if (!isTrustedSite(url)) return false;
+        Uri uri = Uri.parse(url);
+        String path = uri.getPath();
+        return path == null || path.isEmpty() || "/".equals(path);
+    }
+
 
     public static boolean isTrustedSite(String value) {
         if (value == null || value.trim().isEmpty()) return false;
@@ -249,11 +268,24 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (backInitiatedNavigation) {
+                    backInitiatedNavigation = false;
+                } else {
+                    resetBackSequence();
+                }
+            }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                if (clearHistoryOnHome && isHomepageUrl(url)) {
+                    view.clearHistory();
+                    clearHistoryOnHome = false;
+                }
                 if (!splashDismissed) waitForSiteLogos(view, 0);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request.isForMainFrame() && request.hasGesture()) resetBackSequence();
                 return request.isForMainFrame() && openExternalWhenNeeded(request.getUrl());
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -302,8 +334,31 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastBackPressMs > BACK_SEQUENCE_WINDOW_MS) resetBackSequence();
+        lastBackPressMs = now;
+        backPressCount++;
+
+        if (backPressCount == 1) {
+            if (webView != null && webView.canGoBack()) {
+                backInitiatedNavigation = true;
+                webView.goBack();
+            } else if (webView != null && !isHomepageUrl(webView.getUrl())) {
+                backInitiatedNavigation = true;
+                clearHistoryOnHome = true;
+                webView.loadUrl(HOMEPAGE);
+            } else {
+                finish();
+            }
+        } else if (backPressCount == 2) {
+            if (webView != null && !isHomepageUrl(webView.getUrl())) {
+                backInitiatedNavigation = true;
+                clearHistoryOnHome = true;
+                webView.loadUrl(HOMEPAGE);
+            }
+        } else {
+            finish();
+        }
     }
     @Override protected void onDestroy() {
         splashHandler.removeCallbacksAndMessages(null);
