@@ -36,7 +36,8 @@ public final class BackActivity extends MainActivity {
         return "https".equalsIgnoreCase(uri.getScheme())
                 && ("ist1tes-is.com.tr".equalsIgnoreCase(host)
                     || "www.ist1tes-is.com.tr".equalsIgnoreCase(host))
-                && (path == null || path.isEmpty() || "/".equals(path));
+                && (path == null || path.isEmpty() || "/".equals(path))
+                && (uri.getEncodedQuery() == null || uri.getEncodedQuery().isEmpty());
     }
 
     @Override
@@ -50,7 +51,12 @@ public final class BackActivity extends MainActivity {
 
         WebView web = findWebView(getWindow().getDecorView());
         if (backCount == 1) {
-            // First rapid press: previous page (normal Android/WebView back).
+            // Home page is the root: exit immediately, even if WebView has history.
+            if (web != null && isHome(web.getUrl())) {
+                finish();
+                return;
+            }
+            // Inner pages: first press goes to the previous page.
             if (web != null && web.canGoBack()) {
                 web.goBack();
             } else if (web != null && !isHome(web.getUrl())) {
